@@ -632,7 +632,368 @@ QualityMetric
 └── trend: enum(improving, stable, declining)
 ```
 
-### 7.4 Quality Calculation Methods
+### 7.4 Quality Evaluation Configuration
+
+Quality evaluation is fully configurable at the project level, with support for predefined evaluators and custom hooks.
+
+#### 7.4.1 Quality Configuration Model
+
+```
+QualityConfig
+├── config_id: UUID
+├── project_id: UUID
+├── evaluators: EvaluatorConfig[]
+├── aggregation: AggregationConfig
+├── scheduling: EvaluationSchedule
+├── thresholds: ThresholdConfig
+└── hooks: QualityHookConfig[]
+```
+
+#### 7.4.2 Evaluator Configuration
+
+```
+EvaluatorConfig
+├── evaluator_id: string          # Unique identifier
+├── type: enum(builtin, plugin)
+├── builtin_type: string          # If type=builtin: "agreement", "accuracy", etc.
+├── plugin_id: string             # If type=plugin: reference to custom plugin
+├── name: string                  # Display name
+├── enabled: boolean
+├── weight: float                 # Weight in overall score (0.0-1.0)
+├── scope: EvaluatorScope
+├── parameters: object            # Evaluator-specific configuration
+└── field_configs: FieldEvaluatorConfig[]  # Per-field overrides
+```
+
+```
+EvaluatorScope
+├── level: enum(task, field, span)
+├── fields: string[]              # JSONPath to fields to evaluate (null = all)
+├── exclude_fields: string[]      # Fields to exclude
+└── annotation_types: string[]    # Which annotation types to evaluate
+```
+
+```
+FieldEvaluatorConfig
+├── field_path: string            # JSONPath to field
+├── evaluator_override: string    # Use different evaluator for this field
+├── weight: float                 # Field-specific weight
+├── parameters: object            # Field-specific parameters
+└── comparison_mode: enum(exact, fuzzy, semantic, custom)
+```
+
+#### 7.4.3 Built-in Evaluators
+
+| Evaluator ID | Description | Key Parameters |
+|--------------|-------------|----------------|
+| `agreement:cohens_kappa` | Cohen's Kappa for 2 annotators | `weighted`: boolean |
+| `agreement:fleiss_kappa` | Fleiss' Kappa for N annotators | `categories`: string[] |
+| `agreement:krippendorff_alpha` | Krippendorff's Alpha (any # annotators) | `metric`: nominal/ordinal/interval/ratio |
+| `agreement:percentage` | Simple percentage agreement | `partial_credit`: boolean |
+| `agreement:iou` | Intersection over Union (spans/boxes) | `threshold`: float |
+| `accuracy:gold_standard` | Comparison against gold labels | `gold_source`: string |
+| `accuracy:expert_review` | Based on expert review outcomes | `reviewer_roles`: string[] |
+| `consistency:self_agreement` | Agreement on duplicate tasks | `duplicate_rate`: float |
+| `consistency:temporal` | Consistency over time windows | `window_days`: int |
+| `speed:throughput` | Tasks completed per time unit | `time_unit`: string, `complexity_adjusted`: boolean |
+| `speed:time_per_task` | Average time per task | `outlier_handling`: string |
+| `completeness:required_fields` | All required fields populated | `required_fields`: string[] |
+| `completeness:coverage` | Annotation coverage of source | `min_coverage`: float |
+
+#### 7.4.4 Evaluator Parameter Schemas
+
+```yaml
+# Example: Krippendorff's Alpha configuration
+evaluator:
+  id: agreement:krippendorff_alpha
+  parameters:
+    metric: ordinal           # nominal, ordinal, interval, ratio
+    bootstrap_samples: 1000   # For confidence intervals
+    min_annotations: 2        # Minimum annotations required
+    handle_missing: exclude   # exclude, impute, pairwise
+
+# Example: IoU for bounding boxes
+evaluator:
+  id: agreement:iou
+  parameters:
+    threshold: 0.5            # IoU threshold for "agreement"
+    per_class: true           # Calculate per class or overall
+    ignore_classes: ["background"]
+    
+# Example: Gold standard accuracy
+evaluator:
+  id: accuracy:gold_standard
+  parameters:
+    gold_source: adjudicated  # adjudicated, expert, external
+    external_dataset: null    # If gold_source=external
+    partial_credit:
+      enabled: true
+      span_overlap_threshold: 0.8
+      hierarchy_credit: true  # Credit for parent categories
+```
+
+#### 7.4.5 Custom Quality Evaluator Hooks
+
+Custom evaluators can be implemented as plugins (WASM or JS):
+
+```typescript
+// Quality Evaluator Plugin Interface
+interface QualityEvaluatorPlugin {
+  id: string;
+  name: string;
+  version: string;
+  
+  // Schema for configuration parameters
+  parameterSchema: JSONSchema;
+  
+  // Schema for input (what annotations look like)
+  inputSchema: JSONSchema;
+  
+  // Evaluate a single task
+  evaluateTask(input: TaskEvaluationInput, config: object): Promise<TaskEvaluationResult>;
+  
+  // Aggregate results across tasks (optional - default is mean)
+  aggregate?(results: TaskEvaluationResult[], config: object): Promise<AggregateResult>;
+  
+  // Evaluate at user level (optional)
+  evaluateUser?(input: UserEvaluationInput, config: object): Promise<UserEvaluationResult>;
+}
+
+interface TaskEvaluationInput {
+  task: Task;
+  annotations: Annotation[];           // All annotations for this task
+  goldAnnotation?: Annotation;         // Gold standard if available
+  previousEvaluations?: EvaluationResult[];  // Previous eval results
+  context: {
+    projectType: ProjectType;
+    workflow: Workflow;
+    step: WorkflowStep;
+  };
+}
+
+interface TaskEvaluationResult {
+  score: number;                       // 0.0 - 1.0
+  confidence: number;                  // Statistical confidence
+  details: {
+    fieldScores?: Record<string, number>;  // Per-field breakdown
+    pairwiseScores?: PairwiseScore[];      // Annotator pair scores
+    issues?: QualityIssue[];               // Specific problems found
+  };
+  metadata: object;                    // Evaluator-specific data
+}
+
+interface QualityIssue {
+  severity: 'error' | 'warning' | 'info';
+  field?: string;
+  annotatorIds?: string[];
+  message: string;
+  code: string;
+  suggestion?: string;
+}
+```
+
+**Example Custom Evaluator (Medical Coding Accuracy):**
+
+```typescript
+// plugins/quality/medical-coding-accuracy.ts
+import { defineQualityEvaluator } from '@annotation-platform/sdk';
+
+defineQualityEvaluator({
+  id: 'medical:coding_accuracy',
+  name: 'Medical Coding Accuracy',
+  version: '1.0.0',
+  
+  parameterSchema: {
+    type: 'object',
+    properties: {
+      code_system: { type: 'string', enum: ['ICD-10', 'CPT', 'HCPCS'] },
+      hierarchy_credit: { type: 'boolean', default: true },
+      specificity_weight: { type: 'number', default: 0.3 },
+      primary_code_weight: { type: 'number', default: 0.5 },
+    }
+  },
+  
+  async evaluateTask(input, config) {
+    const { annotations, goldAnnotation } = input;
+    
+    if (!goldAnnotation) {
+      // Fall back to consensus-based evaluation
+      return this.evaluateByConsensus(annotations, config);
+    }
+    
+    const results = annotations.map(ann => {
+      const annotatedCodes = ann.data.diagnosis_codes as string[];
+      const goldCodes = goldAnnotation.data.diagnosis_codes as string[];
+      
+      let score = 0;
+      const fieldScores: Record<string, number> = {};
+      
+      // Exact match score
+      const exactMatches = annotatedCodes.filter(c => goldCodes.includes(c));
+      const exactScore = exactMatches.length / Math.max(goldCodes.length, 1);
+      
+      // Hierarchy credit (e.g., E11.9 vs E11.65)
+      let hierarchyScore = 0;
+      if (config.hierarchy_credit) {
+        hierarchyScore = this.calculateHierarchyCredit(annotatedCodes, goldCodes, config);
+      }
+      
+      // Specificity bonus/penalty
+      const specificityScore = this.evaluateSpecificity(annotatedCodes, goldCodes, config);
+      
+      // Weighted combination
+      score = (exactScore * 0.6) + (hierarchyScore * 0.25) + (specificityScore * 0.15);
+      
+      fieldScores['diagnosis_codes'] = score;
+      
+      return { annotationId: ann.id, score, fieldScores };
+    });
+    
+    const avgScore = results.reduce((sum, r) => sum + r.score, 0) / results.length;
+    
+    return {
+      score: avgScore,
+      confidence: this.calculateConfidence(results),
+      details: {
+        fieldScores: this.aggregateFieldScores(results),
+        issues: this.identifyIssues(annotations, goldAnnotation, config),
+      },
+      metadata: {
+        evaluation_method: goldAnnotation ? 'gold_standard' : 'consensus',
+        code_system: config.code_system,
+      }
+    };
+  },
+  
+  calculateHierarchyCredit(annotated: string[], gold: string[], config: any): number {
+    // ICD-10 codes have hierarchical structure: E11 > E11.6 > E11.65
+    let credit = 0;
+    for (const gc of gold) {
+      const prefix3 = gc.substring(0, 3);
+      const prefix4 = gc.substring(0, 5);
+      
+      if (annotated.some(ac => ac.startsWith(prefix3))) {
+        credit += 0.5;  // Category match
+      }
+      if (annotated.some(ac => ac.startsWith(prefix4))) {
+        credit += 0.3;  // Subcategory match
+      }
+    }
+    return Math.min(1, credit / gold.length);
+  }
+});
+```
+
+#### 7.4.6 Quality Aggregation Configuration
+
+```
+AggregationConfig
+├── method: enum(weighted_mean, harmonic_mean, min, geometric_mean, custom)
+├── weights: Map<string, float>    # evaluator_id -> weight
+├── custom_aggregator: string      # Plugin ID if method=custom
+├── exclude_below_confidence: float  # Exclude low-confidence scores
+└── outlier_handling: enum(include, winsorize, exclude)
+```
+
+#### 7.4.7 Evaluation Scheduling
+
+```
+EvaluationSchedule
+├── trigger: enum(on_submit, on_complete, periodic, manual)
+├── periodic_interval: duration    # If trigger=periodic
+├── batch_size: int                # Tasks per evaluation batch
+├── delay_after_submit: duration   # Wait before evaluating
+├── reevaluate_on: string[]        # Events that trigger re-evaluation
+└── priority: enum(real_time, background, low)
+```
+
+#### 7.4.8 Quality-Based Actions (Extended)
+
+```
+ThresholdConfig
+├── rules: QualityRule[]
+├── alert_channels: AlertChannel[]
+└── escalation_policy: EscalationPolicy
+```
+
+```
+QualityRule
+├── rule_id: UUID
+├── name: string
+├── description: string
+├── condition: QualityCondition
+├── actions: QualityAction[]
+├── cooldown: duration             # Prevent action spam
+├── enabled: boolean
+└── priority: int
+```
+
+```
+QualityCondition
+├── type: enum(threshold, trend, comparison, composite)
+├── metric: string                 # Evaluator ID or "overall"
+├── operator: enum(lt, lte, gt, gte, eq, between, change_by)
+├── value: float | float[]
+├── window: duration               # For trend-based conditions
+├── min_sample_size: int
+├── scope: enum(task, user, team, project)
+└── filters: ConditionFilter[]     # Additional filters
+```
+
+```yaml
+# Example Quality Rules Configuration
+quality_rules:
+  - name: "Low Agreement Alert"
+    condition:
+      type: threshold
+      metric: agreement:krippendorff_alpha
+      operator: lt
+      value: 0.7
+      scope: project
+      window: 24h
+      min_sample_size: 50
+    actions:
+      - type: alert
+        parameters:
+          channel: slack
+          message: "Project agreement dropped below 0.7"
+          
+  - name: "User Quality Decline"
+    condition:
+      type: trend
+      metric: overall
+      operator: change_by
+      value: -0.15  # 15% decline
+      window: 7d
+      scope: user
+    actions:
+      - type: restrict_assignment
+        parameters:
+          restriction: reduce_volume
+          factor: 0.5
+      - type: notify
+        parameters:
+          target: team_lead
+          
+  - name: "Auto-approve High Quality"
+    condition:
+      type: composite
+      operator: and
+      conditions:
+        - metric: accuracy:gold_standard
+          operator: gte
+          value: 0.95
+        - metric: completeness:required_fields
+          operator: eq
+          value: 1.0
+    actions:
+      - type: workflow_action
+        parameters:
+          action: auto_approve
+          skip_review: true
+```
+
+### 7.5 Quality Calculation Methods
 
 | Metric | Calculation | Use Case |
 |--------|-------------|----------|
@@ -643,7 +1004,7 @@ QualityMetric
 | Rejection Rate | % of annotations rejected in review | Review workflows |
 | Adjudication Rate | % of tasks requiring adjudication | Conflict frequency |
 
-### 7.5 Quality-Based Actions
+### 7.6 Quality-Based Actions
 
 ```
 QualityRule
@@ -669,6 +1030,546 @@ QualityAction
 ├── target: enum(user, team, project)
 ├── parameters: object
 └── notification_config: NotificationConfig
+```
+
+---
+
+## 7A. Annotation Storage Architecture
+
+### 7A.1 Storage Design Principles
+
+1. **Write-optimized for annotation capture**: High throughput for concurrent annotators
+2. **Read-optimized for exports**: Efficient batch retrieval for ML pipelines
+3. **Flexible schema**: Support varying annotation structures across project types
+4. **Full audit trail**: Immutable history for compliance
+5. **Scalable**: Handle billions of annotations across thousands of projects
+
+### 7A.2 Data Model
+
+#### 7A.2.1 Core Annotation Storage
+
+```sql
+-- Partitioned by project for query isolation and maintenance
+CREATE TABLE annotations (
+    annotation_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id             UUID NOT NULL REFERENCES tasks(task_id),
+    step_id             UUID NOT NULL,
+    user_id             UUID NOT NULL REFERENCES users(user_id),
+    project_id          UUID NOT NULL,  -- Denormalized for partitioning
+    
+    -- Annotation data stored as JSONB for flexibility
+    data                JSONB NOT NULL,
+    
+    -- Status tracking
+    status              annotation_status NOT NULL DEFAULT 'draft',
+    
+    -- Versioning
+    version             INT NOT NULL DEFAULT 1,
+    parent_version_id   UUID REFERENCES annotations(annotation_id),
+    
+    -- Timestamps
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    submitted_at        TIMESTAMPTZ,
+    
+    -- Quality scores (denormalized for query performance)
+    quality_score       FLOAT,
+    quality_evaluated_at TIMESTAMPTZ,
+    
+    -- Metadata
+    time_spent_ms       BIGINT,
+    client_metadata     JSONB,  -- Browser, session info, etc.
+    
+    CONSTRAINT valid_quality CHECK (quality_score IS NULL OR (quality_score >= 0 AND quality_score <= 1))
+) PARTITION BY HASH (project_id);
+
+-- Create partitions (example: 16 partitions)
+CREATE TABLE annotations_p0 PARTITION OF annotations FOR VALUES WITH (MODULUS 16, REMAINDER 0);
+CREATE TABLE annotations_p1 PARTITION OF annotations FOR VALUES WITH (MODULUS 16, REMAINDER 1);
+-- ... etc
+
+-- Indexes optimized for common access patterns
+CREATE INDEX idx_annotations_task ON annotations(task_id, step_id);
+CREATE INDEX idx_annotations_user ON annotations(user_id, created_at DESC);
+CREATE INDEX idx_annotations_project_status ON annotations(project_id, status, created_at DESC);
+CREATE INDEX idx_annotations_submitted ON annotations(project_id, submitted_at DESC) WHERE status = 'submitted';
+
+-- GIN index for JSONB queries (annotation content search)
+CREATE INDEX idx_annotations_data ON annotations USING GIN (data jsonb_path_ops);
+```
+
+#### 7A.2.2 Annotation History (Event Sourcing)
+
+```sql
+-- Immutable audit log of all annotation changes
+CREATE TABLE annotation_events (
+    event_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    annotation_id       UUID NOT NULL,
+    event_type          VARCHAR(50) NOT NULL,  -- created, updated, submitted, approved, rejected
+    
+    -- Full snapshot at this point in time
+    data_snapshot       JSONB NOT NULL,
+    
+    -- Change details
+    changes             JSONB,  -- JSON Patch of what changed
+    
+    -- Actor information
+    actor_id            UUID NOT NULL,
+    actor_type          VARCHAR(20) NOT NULL,  -- user, system, api
+    
+    -- Timestamp (immutable)
+    occurred_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    
+    -- Context
+    request_id          UUID,  -- Correlation ID
+    ip_address          INET,
+    user_agent          TEXT
+) PARTITION BY RANGE (occurred_at);
+
+-- Monthly partitions for time-based retention
+CREATE TABLE annotation_events_2025_01 PARTITION OF annotation_events
+    FOR VALUES FROM ('2025-01-01') TO ('2025-02-01');
+-- ... create partitions automatically via pg_partman or similar
+
+CREATE INDEX idx_annotation_events_annotation ON annotation_events(annotation_id, occurred_at);
+CREATE INDEX idx_annotation_events_actor ON annotation_events(actor_id, occurred_at DESC);
+```
+
+#### 7A.2.3 Materialized Views for Analytics
+
+```sql
+-- Daily aggregates for dashboard performance
+CREATE MATERIALIZED VIEW mv_daily_annotation_stats AS
+SELECT 
+    date_trunc('day', submitted_at) AS day,
+    project_id,
+    user_id,
+    COUNT(*) AS annotation_count,
+    AVG(quality_score) AS avg_quality,
+    AVG(time_spent_ms) AS avg_time_ms,
+    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_spent_ms) AS median_time_ms
+FROM annotations
+WHERE status = 'submitted'
+GROUP BY 1, 2, 3;
+
+CREATE UNIQUE INDEX ON mv_daily_annotation_stats(day, project_id, user_id);
+
+-- Refresh periodically
+-- REFRESH MATERIALIZED VIEW CONCURRENTLY mv_daily_annotation_stats;
+
+-- User quality summary
+CREATE MATERIALIZED VIEW mv_user_quality_summary AS
+SELECT 
+    user_id,
+    project_id,
+    COUNT(*) AS total_annotations,
+    AVG(quality_score) FILTER (WHERE quality_score IS NOT NULL) AS avg_quality,
+    STDDEV(quality_score) FILTER (WHERE quality_score IS NOT NULL) AS quality_stddev,
+    COUNT(*) FILTER (WHERE quality_score >= 0.9) AS high_quality_count,
+    COUNT(*) FILTER (WHERE quality_score < 0.7) AS low_quality_count,
+    MAX(submitted_at) AS last_annotation_at
+FROM annotations
+WHERE status IN ('submitted', 'approved')
+GROUP BY user_id, project_id;
+```
+
+### 7A.3 Scalability Architecture
+
+#### 7A.3.1 Write Path
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  Annotation  │────▶│   API Server │────▶│    Redis     │
+│     UI       │     │              │     │  (Write-Ahead)│
+└──────────────┘     └──────────────┘     └──────┬───────┘
+                                                  │
+                     ┌──────────────┐              │
+                     │  Background  │◀─────────────┘
+                     │   Workers    │
+                     └──────┬───────┘
+                            │
+                     ┌──────▼───────┐
+                     │  PostgreSQL  │
+                     │ (Partitioned)│
+                     └──────────────┘
+```
+
+1. **Immediate acknowledgment**: API accepts annotation, writes to Redis
+2. **Async persistence**: Background workers batch-write to PostgreSQL
+3. **Optimistic UI**: Client shows success immediately
+4. **Conflict resolution**: Version checks on final write
+
+#### 7A.3.2 Read Path (Hot Data)
+
+```rust
+// crates/domain/annotations/src/repository.rs
+
+impl AnnotationRepository {
+    /// Fetch annotations for active tasks (hot path)
+    pub async fn get_task_annotations(
+        &self,
+        task_id: Uuid,
+        step_id: Option<Uuid>,
+    ) -> Result<Vec<Annotation>> {
+        // Try cache first (Redis)
+        let cache_key = format!("annotations:task:{}:{}", task_id, step_id.unwrap_or_default());
+        
+        if let Some(cached) = self.cache.get(&cache_key).await? {
+            return Ok(serde_json::from_str(&cached)?);
+        }
+        
+        // Query database
+        let annotations = sqlx::query_as!(
+            Annotation,
+            r#"
+            SELECT annotation_id, task_id, step_id, user_id, data, status as "status: _",
+                   version, created_at, updated_at, submitted_at, quality_score
+            FROM annotations
+            WHERE task_id = $1 
+              AND ($2::uuid IS NULL OR step_id = $2)
+              AND status != 'superseded'
+            ORDER BY created_at DESC
+            "#,
+            task_id,
+            step_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        
+        // Cache for 5 minutes
+        self.cache.set_ex(&cache_key, &serde_json::to_string(&annotations)?, 300).await?;
+        
+        Ok(annotations)
+    }
+}
+```
+
+#### 7A.3.3 Read Path (Export/Analytics - Cold Data)
+
+```rust
+// crates/infrastructure/src/export.rs
+
+pub struct AnnotationExporter {
+    pool: PgPool,
+    storage: Arc<dyn ObjectStorage>,
+}
+
+impl AnnotationExporter {
+    /// Stream annotations for export (memory-efficient)
+    pub fn stream_project_annotations(
+        &self,
+        project_id: Uuid,
+        filters: ExportFilters,
+    ) -> impl Stream<Item = Result<AnnotationExportRow>> + '_ {
+        
+        let query = r#"
+            SELECT 
+                a.annotation_id,
+                a.task_id,
+                t.input_data as task_input,
+                a.data as annotation_data,
+                a.user_id,
+                a.quality_score,
+                a.submitted_at
+            FROM annotations a
+            JOIN tasks t ON a.task_id = t.task_id
+            WHERE a.project_id = $1
+              AND a.status = ANY($2)
+              AND ($3::timestamptz IS NULL OR a.submitted_at >= $3)
+              AND ($4::timestamptz IS NULL OR a.submitted_at <= $4)
+            ORDER BY a.submitted_at
+        "#;
+        
+        sqlx::query_as::<_, AnnotationExportRow>(query)
+            .bind(project_id)
+            .bind(&filters.statuses)
+            .bind(filters.from_date)
+            .bind(filters.to_date)
+            .fetch(&self.pool)  // Returns async stream
+    }
+    
+    /// Export to Parquet for ML pipelines
+    pub async fn export_to_parquet(
+        &self,
+        project_id: Uuid,
+        filters: ExportFilters,
+        output_path: &str,
+    ) -> Result<ExportResult> {
+        use arrow::array::*;
+        use parquet::arrow::ArrowWriter;
+        
+        let mut annotation_ids = Vec::new();
+        let mut task_inputs = Vec::new();
+        let mut annotation_data = Vec::new();
+        let mut quality_scores = Vec::new();
+        
+        let mut stream = self.stream_project_annotations(project_id, filters);
+        let mut row_count = 0;
+        
+        while let Some(row) = stream.next().await {
+            let row = row?;
+            annotation_ids.push(row.annotation_id.to_string());
+            task_inputs.push(row.task_input.to_string());
+            annotation_data.push(row.annotation_data.to_string());
+            quality_scores.push(row.quality_score);
+            row_count += 1;
+            
+            // Write in batches of 100k rows
+            if row_count % 100_000 == 0 {
+                // Flush batch to Parquet
+            }
+        }
+        
+        // Write final batch and upload to S3
+        let s3_path = format!("exports/{}/{}.parquet", project_id, Utc::now().timestamp());
+        self.storage.upload(&s3_path, parquet_bytes).await?;
+        
+        Ok(ExportResult {
+            row_count,
+            file_path: s3_path,
+            file_size_bytes: parquet_bytes.len(),
+        })
+    }
+}
+```
+
+### 7A.4 Data Access Patterns
+
+#### 7A.4.1 REST API Endpoints
+
+```
+GET  /api/v1/annotations
+     ?project_id=...
+     &task_id=...
+     &user_id=...
+     &status=submitted,approved
+     &from_date=2025-01-01
+     &to_date=2025-01-31
+     &include_task_data=true
+     &page_size=100
+     &cursor=...
+
+GET  /api/v1/annotations/{id}
+GET  /api/v1/annotations/{id}/history
+GET  /api/v1/tasks/{task_id}/annotations
+
+# Bulk operations
+POST /api/v1/annotations/bulk
+     { "annotations": [...] }
+
+# Export endpoints
+POST /api/v1/projects/{id}/export
+     {
+       "format": "parquet",
+       "filters": { ... },
+       "destination": "s3://bucket/path"
+     }
+
+GET  /api/v1/projects/{id}/export/{export_id}/status
+GET  /api/v1/projects/{id}/export/{export_id}/download
+```
+
+#### 7A.4.2 Streaming Export API
+
+```rust
+// Server-Sent Events for large exports
+async fn stream_annotations(
+    State(state): State<AppState>,
+    Path(project_id): Path<Uuid>,
+    Query(filters): Query<ExportFilters>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let stream = state.annotation_repo
+        .stream_project_annotations(project_id, filters)
+        .map(|result| {
+            match result {
+                Ok(row) => Ok(Event::default()
+                    .event("annotation")
+                    .json_data(row)
+                    .unwrap()),
+                Err(e) => Ok(Event::default()
+                    .event("error")
+                    .data(e.to_string())),
+            }
+        });
+    
+    Sse::new(stream).keep_alive(
+        KeepAlive::new()
+            .interval(Duration::from_secs(15))
+            .text("keep-alive")
+    )
+}
+```
+
+#### 7A.4.3 Export Formats
+
+| Format | Use Case | Features |
+|--------|----------|----------|
+| JSON Lines (.jsonl) | Streaming ingestion | One JSON object per line, easy to parse |
+| Parquet | ML training, analytics | Columnar, compressed, schema-preserving |
+| CSV | Simple exports, spreadsheets | Universal compatibility |
+| COCO | Computer vision tasks | Standard format for object detection |
+| CoNLL | NER/sequence labeling | Standard format for NLP tasks |
+| Custom | Domain-specific | Via export hooks/plugins |
+
+#### 7A.4.4 Export Configuration
+
+```yaml
+export_config:
+  format: parquet
+  
+  # What to include
+  include:
+    task_input: true
+    annotation_data: true
+    quality_scores: true
+    user_ids: false          # Privacy: anonymize
+    timestamps: true
+    
+  # Data transformations
+  transformations:
+    - type: flatten_json
+      fields: ["annotation_data.entities"]
+    - type: anonymize
+      fields: ["user_id"]
+      method: hash
+    - type: filter_fields
+      include: ["text", "labels", "spans"]
+      
+  # Partitioning for large exports
+  partitioning:
+    enabled: true
+    strategy: by_date
+    partition_size: 100000   # rows per file
+    
+  # Destination
+  destination:
+    type: s3
+    bucket: ml-training-data
+    prefix: "projects/{project_id}/exports/{export_id}/"
+    
+  # Notifications
+  on_complete:
+    - type: webhook
+      url: https://ml-pipeline.example.com/trigger
+    - type: email
+      recipients: ["data-team@example.com"]
+```
+
+### 7A.5 Data Access for Analytics
+
+#### 7A.5.1 Read Replicas
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│   Primary    │────▶│   Replica 1  │     │   Replica 2  │
+│  (Writes)    │     │  (API Reads) │     │  (Analytics) │
+└──────────────┘     └──────────────┘     └──────────────┘
+                            │                     │
+                     ┌──────▼───────┐     ┌───────▼──────┐
+                     │  API Servers │     │   BI Tools   │
+                     └──────────────┘     │  (Metabase,  │
+                                          │   Tableau)   │
+                                          └──────────────┘
+```
+
+#### 7A.5.2 Direct Database Access (Analytics)
+
+For analytics teams needing direct SQL access:
+
+```sql
+-- Create read-only role with row-level security
+CREATE ROLE analytics_reader;
+GRANT CONNECT ON DATABASE annotation_platform TO analytics_reader;
+GRANT USAGE ON SCHEMA public TO analytics_reader;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO analytics_reader;
+
+-- Row-level security for project isolation
+ALTER TABLE annotations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY analytics_project_access ON annotations
+    FOR SELECT
+    TO analytics_reader
+    USING (project_id IN (
+        SELECT project_id FROM user_project_access 
+        WHERE user_id = current_setting('app.current_user_id')::uuid
+    ));
+```
+
+#### 7A.5.3 Data Warehouse Integration
+
+```rust
+// Sync to data warehouse (e.g., Snowflake, BigQuery)
+pub struct WarehouseSync {
+    source_pool: PgPool,
+    warehouse: Arc<dyn DataWarehouse>,
+}
+
+impl WarehouseSync {
+    pub async fn sync_incremental(&self, last_sync: DateTime<Utc>) -> Result<SyncResult> {
+        // Extract changed annotations since last sync
+        let changes = sqlx::query_as!(
+            AnnotationChange,
+            r#"
+            SELECT * FROM annotation_events
+            WHERE occurred_at > $1
+            ORDER BY occurred_at
+            "#,
+            last_sync
+        )
+        .fetch_all(&self.source_pool)
+        .await?;
+        
+        // Transform to warehouse schema
+        let warehouse_rows: Vec<WarehouseRow> = changes
+            .into_iter()
+            .map(|c| c.into())
+            .collect();
+        
+        // Load to warehouse
+        self.warehouse.upsert("annotations", &warehouse_rows).await?;
+        
+        Ok(SyncResult {
+            rows_synced: warehouse_rows.len(),
+            sync_timestamp: Utc::now(),
+        })
+    }
+}
+```
+
+### 7A.6 Data Lifecycle Management
+
+```yaml
+data_lifecycle:
+  # Hot tier: Recent, actively accessed data
+  hot:
+    storage: postgresql_primary
+    retention: 90d
+    
+  # Warm tier: Older data, less frequent access
+  warm:
+    storage: postgresql_archive
+    retention: 2y
+    compression: enabled
+    
+  # Cold tier: Long-term archive
+  cold:
+    storage: s3_glacier
+    retention: 7y
+    format: parquet
+    
+  # Policies
+  policies:
+    - name: archive_completed_projects
+      condition: "project.status = 'archived' AND project.completed_at < NOW() - INTERVAL '90 days'"
+      action: move_to_warm
+      
+    - name: delete_draft_annotations
+      condition: "status = 'draft' AND updated_at < NOW() - INTERVAL '30 days'"
+      action: delete
+      
+    - name: anonymize_old_data
+      condition: "submitted_at < NOW() - INTERVAL '2 years'"
+      action: anonymize_pii
 ```
 
 ---
