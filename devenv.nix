@@ -46,7 +46,7 @@
     commitizen.enable = true;
   };
 
-  devcontainer.enable = true;
+  # devcontainer.enable = true;
 
   claude.code = {
     enable = true;

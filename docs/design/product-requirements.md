@@ -217,27 +217,47 @@ Workflow
 - One annotator per task
 - Direct completion upon submission
 
-#### 4.2.2 Multiple Annotations with Best Vote
+#### 4.2.2 Multi-Annotation with Consensus
 ```
-[Task] → [Annotate x N] → [Vote/Consensus] → [Complete]
+[Task] → [Annotate x N] → [Agreement Check] ─── agreed ───→ [Complete]
+                                │
+                                └── disagreed ──→ [Resolution] → [Complete]
 ```
 - N annotators independently annotate same task
-- System calculates consensus (majority vote, weighted vote, etc.)
-- Auto-completes if agreement threshold met
-- Escalates to adjudication if threshold not met
+- System calculates agreement (configurable metric)
+- If threshold met → auto-complete with consensus result
+- If threshold not met → resolution strategy kicks in
 
-#### 4.2.3 Multi-Annotation with Adjudication
-```
-[Task] → [Annotate x N] → [Agreement Check] → [Adjudicate] → [Complete]
-                                    ↓
-                              [Auto-Complete if agreed]
-```
-- N annotators independently annotate
-- Agreement calculated
-- Disagreements routed to adjudicator
-- Adjudicator sees all annotations and makes final decision
+**Resolution strategies (configurable):**
 
-#### 4.2.4 Custom Workflow
+| Strategy | Behavior |
+|----------|----------|
+| `majority_vote` | Accept majority answer, complete automatically |
+| `weighted_vote` | Weight by annotator quality scores, complete automatically |
+| `adjudication` | Route to human adjudicator for final decision |
+| `additional_annotators` | Add more annotators until threshold met or max reached |
+| `escalate` | Flag for project admin review |
+
+```xml
+<ConsensusConfig>
+  <Metric>agreement:krippendorff_alpha</Metric>
+  <Threshold>0.85</Threshold>
+  
+  <!-- When annotators agree -->
+  <OnAgreement action="complete">
+    <ConsensusMethod>majority</ConsensusMethod>
+  </OnAgreement>
+  
+  <!-- When they disagree -->
+  <OnDisagreement>
+    <Strategy>adjudication</Strategy>
+    <!-- Or: majority_vote, weighted_vote, additional_annotators -->
+    <FallbackStrategy>escalate</FallbackStrategy>
+  </OnDisagreement>
+</ConsensusConfig>
+```
+
+#### 4.2.3 Custom Workflow
 ```
 [Task] → [Step 1] → [Condition] → [Step 2a] → [Step 3] → [Complete]
                          ↓
@@ -256,28 +276,384 @@ WorkflowStep
 ├── name: string
 ├── type: enum(annotation, review, adjudication, auto_process, conditional)
 ├── layout_id: UUID
-├── input_mapping: InputMapping  # Maps data to layout
-├── output_mapping: OutputMapping  # Maps layout output to workflow data
+├── input_mapping: InputMapping
+├── output_mapping: OutputMapping
 ├── assignment_config: StepAssignmentConfig
+├── completion_criteria: StepCompletionCriteria   # When THIS task can proceed
+├── goal_contributions: GoalContribution[]        # How this step contributes to project goals
 ├── timeout: duration
 ├── retry_policy: RetryPolicy
 └── hooks: StepHooks
 ```
 
-#### 4.3.1 Step Assignment Config
+#### 4.3.1 Step Completion Criteria
+
+Step completion criteria define **when a single task can move to the next step**. This is simple and task-scoped:
+
+```
+StepCompletionCriteria
+├── type: enum(annotation_count, review_decision, auto, manual)
+├── annotation_count: int              # For annotation steps: how many annotators needed
+├── unique_annotators: boolean         # Must be different users
+├── min_required: int                  # Minimum to proceed if some fail/timeout
+├── consensus_config: ConsensusConfig  # For multi-annotation: agreement handling
+└── timeout_action: enum(proceed, retry, escalate)
+```
+
+**Examples:**
+
+```xml
+<!-- Single annotator -->
+<CompletionCriteria type="annotation_count">
+  <Count>1</Count>
+</CompletionCriteria>
+
+<!-- Dual annotation -->
+<CompletionCriteria type="annotation_count">
+  <Count>2</Count>
+  <UniqueAnnotators>true</UniqueAnnotators>
+  <MinRequired>2</MinRequired>
+</CompletionCriteria>
+
+<!-- Review step: single reviewer decides -->
+<CompletionCriteria type="review_decision" />
+
+<!-- Auto-process step: completes when processing done -->
+<CompletionCriteria type="auto" />
+```
+
+#### 4.3.2 Goal Contributions
+
+Steps **contribute** to project-level goals. Each step declares what metrics it reports:
+
+```
+GoalContribution
+├── goal_id: string                    # Reference to project goal
+├── contribution_type: enum(count, quality_metric, progress)
+├── metric_source: string              # What to measure from this step
+├── aggregation: enum(sum, latest, average, min, max)
+└── weight: float                      # Relative weight for composite goals
+```
+
+```xml
+<Step id="annotate" name="Initial Annotation">
+  <!-- When is this task done at this step? -->
+  <CompletionCriteria type="annotation_count">
+    <Count>2</Count>
+    <UniqueAnnotators>true</UniqueAnnotators>
+  </CompletionCriteria>
+  
+  <!-- How does this step contribute to project goals? -->
+  <GoalContributions>
+    <!-- Contributes to volume goal -->
+    <Contribution goal="volume">
+      <Type>count</Type>
+      <MetricSource>submitted_annotations</MetricSource>
+      <Aggregation>sum</Aggregation>
+    </Contribution>
+    
+    <!-- Contributes to agreement goal (measured after both annotators submit) -->
+    <Contribution goal="quality">
+      <Type>quality_metric</Type>
+      <MetricSource>inter_annotator_agreement</MetricSource>
+      <Aggregation>average</Aggregation>
+    </Contribution>
+  </GoalContributions>
+</Step>
+```
+
+#### 4.3.3 Step Assignment Config
 
 ```
 StepAssignmentConfig
 ├── assignment_mode: enum(auto, manual, pool)
 ├── required_skills: SkillRequirement[]
 ├── required_roles: Role[]
-├── annotators_required: int  # For multi-annotation steps
-├── prevent_reassignment: boolean  # Don't assign same user from previous steps
+├── prevent_reassignment: boolean          # Don't assign same user from previous steps
 ├── team_restriction: UUID[]
-└── load_balancing: enum(round_robin, least_loaded, quality_weighted)
+├── load_balancing: enum(round_robin, least_loaded, quality_weighted)
+├── max_concurrent_per_user: int           # Max tasks a user can have in progress
+└── priority_rules: PriorityRule[]         # How to prioritize task assignment
 ```
 
-### 4.4 Transitions
+---
+
+### 4.4 Project Goals
+
+Project goals define **the overall objectives of the project** and when the project is considered complete. Goals are tracked across all workflow steps.
+
+```
+ProjectGoal
+├── goal_id: string
+├── name: string
+├── type: enum(volume, quality, deadline, duration, composite, manual)
+├── config: GoalConfig
+├── priority: int                      # For composite: evaluation order
+├── required: boolean                  # Must be met vs. nice-to-have
+└── notifications: GoalNotification[]
+```
+
+#### 4.4.1 Goal Types
+
+**Volume Goal** — Total output across the project:
+
+```xml
+<Goal id="volume" name="Annotation Volume" type="volume" required="true">
+  <Target>50000</Target>
+  <Unit>annotations</Unit>
+  <CountingRule>
+    <!-- What counts toward the goal -->
+    <Status>submitted,approved</Status>
+    <Steps>annotate,review</Steps>           <!-- Which steps contribute -->
+    <DedupeBy>task</DedupeBy>                <!-- Count unique tasks, not total annotations -->
+  </CountingRule>
+</Goal>
+```
+
+**Quality Goal** — Aggregate quality metric:
+
+```xml
+<Goal id="quality" name="Inter-Annotator Agreement" type="quality" required="true">
+  <Metric>agreement:krippendorff_alpha</Metric>
+  <Threshold>0.85</Threshold>
+  <EvaluationWindow>
+    <Type>rolling</Type>
+    <Size>1000</Size>                        <!-- Last 1000 tasks -->
+  </EvaluationWindow>
+  <MinSampleSize>100</MinSampleSize>         <!-- Don't evaluate until 100 tasks -->
+  <MeasuredAt>                               <!-- When/where to measure -->
+    <Step>agreement_check</Step>
+    <Trigger>on_step_complete</Trigger>
+  </MeasuredAt>
+</Goal>
+```
+
+**Deadline Goal** — Time-based completion:
+
+```xml
+<Goal id="deadline" name="Q1 Delivery" type="deadline" required="true">
+  <Deadline>2025-03-31T23:59:59Z</Deadline>
+  <Warnings>
+    <Warning at="P30D">30 days remaining</Warning>
+    <Warning at="P7D">7 days remaining - escalate if behind</Warning>
+    <Warning at="P1D">Final day</Warning>
+  </Warnings>
+  <OnDeadline>
+    <Action>complete_as_is</Action>          <!-- Or: extend, escalate, pause -->
+    <NotifyRoles>project_admin,stakeholder</NotifyRoles>
+  </OnDeadline>
+</Goal>
+```
+
+**Duration Goal** — Relative time from start:
+
+```xml
+<Goal id="duration" name="30-Day Sprint" type="duration">
+  <Duration>P30D</Duration>
+  <StartFrom>first_task_created</StartFrom>  <!-- Or: project_start, first_annotation -->
+</Goal>
+```
+
+**Composite Goal** — Combine multiple goals:
+
+```xml
+<Goal id="complete" name="Project Complete" type="composite" required="true">
+  <Operator>and</Operator>
+  <Goals>
+    <GoalRef id="volume" />                  <!-- Must hit volume target -->
+    <GoalRef id="quality" />                 <!-- AND quality target -->
+  </Goals>
+  
+  <!-- Override: deadline supersedes other goals -->
+  <Override>
+    <Condition>
+      <GoalRef id="deadline" status="reached" />
+    </Condition>
+    <Action>complete</Action>
+    <Reason>Deadline reached - completing with current progress</Reason>
+  </Override>
+</Goal>
+```
+
+**Manual Goal** — Human decides when done:
+
+```xml
+<Goal id="manual_review" name="Stakeholder Signoff" type="manual">
+  <AuthorizedRoles>project_admin,stakeholder</AuthorizedRoles>
+  <RequireReason>true</RequireReason>
+  <Checklist>
+    <Item>Quality metrics reviewed</Item>
+    <Item>Sample annotations verified</Item>
+    <Item>Export validated</Item>
+  </Checklist>
+</Goal>
+```
+
+#### 4.4.2 Goal Progress Tracking
+
+Each step reports its contribution to project goals:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Project Goals                                                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  📊 Volume: 32,450 / 50,000 (65%)                                          │
+│     ├── Annotate step: +32,450 annotations                                 │
+│     ├── Review step: +3,245 reviewed                                       │
+│     └── Rate: ~1,200/day → ETA: Feb 15                                     │
+│                                                                             │
+│  ✅ Quality: 87.3% agreement (target: 85%)                                  │
+│     ├── Measured at: Agreement Check step                                  │
+│     ├── Sample size: 28,420 tasks                                          │
+│     └── Trend: Stable (±0.5% over 7 days)                                  │
+│                                                                             │
+│  📅 Deadline: 45 days remaining (March 31)                                  │
+│     └── Status: On track (volume rate sufficient)                          │
+│                                                                             │
+│  🎯 Overall: IN PROGRESS                                                    │
+│     └── Blocking: Volume goal (35% remaining)                              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 4.4.3 Goal Evaluation Engine
+
+```rust
+// crates/domain/goals/src/evaluator.rs
+
+pub struct ProjectGoalEvaluator {
+    goal_registry: Arc<GoalRegistry>,
+    metrics_service: Arc<MetricsService>,
+}
+
+impl ProjectGoalEvaluator {
+    /// Evaluate all project goals and return overall status
+    pub async fn evaluate_project(&self, project_id: Uuid) -> Result<ProjectGoalStatus> {
+        let goals = self.goal_registry.get_project_goals(project_id).await?;
+        let mut statuses = Vec::new();
+        
+        for goal in &goals {
+            let status = self.evaluate_goal(project_id, goal).await?;
+            statuses.push(status);
+        }
+        
+        // Determine overall project status
+        let required_goals: Vec<_> = statuses.iter()
+            .filter(|s| s.goal.required)
+            .collect();
+        
+        let overall = if required_goals.iter().all(|s| s.is_complete()) {
+            ProjectStatus::Complete
+        } else if required_goals.iter().any(|s| s.is_failed()) {
+            ProjectStatus::Failed
+        } else {
+            ProjectStatus::InProgress
+        };
+        
+        Ok(ProjectGoalStatus {
+            project_id,
+            overall_status: overall,
+            goal_statuses: statuses,
+            evaluated_at: Utc::now(),
+        })
+    }
+    
+    /// Evaluate a single goal by aggregating step contributions
+    async fn evaluate_goal(&self, project_id: Uuid, goal: &ProjectGoal) -> Result<GoalStatus> {
+        match &goal.goal_type {
+            GoalType::Volume(config) => {
+                // Sum contributions from all steps
+                let contributions = self.metrics_service
+                    .get_goal_contributions(project_id, &goal.goal_id)
+                    .await?;
+                
+                let total: i64 = contributions.iter()
+                    .map(|c| c.value as i64)
+                    .sum();
+                
+                let progress = total as f64 / config.target as f64;
+                
+                Ok(GoalStatus {
+                    goal: goal.clone(),
+                    current_value: total as f64,
+                    target_value: config.target as f64,
+                    progress,
+                    status: if total >= config.target { Status::Complete } else { Status::InProgress },
+                    contributions,
+                })
+            }
+            
+            GoalType::Quality(config) => {
+                // Get latest quality measurement from designated step
+                let measurement = self.metrics_service
+                    .get_latest_quality_metric(project_id, &config.metric, &config.measured_at)
+                    .await?;
+                
+                let meets_threshold = measurement
+                    .map(|m| m.value >= config.threshold && m.sample_size >= config.min_sample_size)
+                    .unwrap_or(false);
+                
+                Ok(GoalStatus {
+                    goal: goal.clone(),
+                    current_value: measurement.map(|m| m.value).unwrap_or(0.0),
+                    target_value: config.threshold,
+                    progress: measurement.map(|m| m.value / config.threshold).unwrap_or(0.0).min(1.0),
+                    status: if meets_threshold { Status::Complete } else { Status::InProgress },
+                    ..Default::default()
+                })
+            }
+            
+            GoalType::Deadline(config) => {
+                let now = Utc::now();
+                let remaining = config.deadline - now;
+                
+                Ok(GoalStatus {
+                    goal: goal.clone(),
+                    status: if now >= config.deadline { Status::Reached } else { Status::Pending },
+                    time_remaining: Some(remaining),
+                    ..Default::default()
+                })
+            }
+            
+            GoalType::Composite(config) => {
+                // Recursively evaluate child goals
+                let child_statuses: Vec<_> = futures::future::try_join_all(
+                    config.goal_refs.iter().map(|id| self.evaluate_goal(project_id, &goals[id]))
+                ).await?;
+                
+                let is_complete = match config.operator {
+                    Operator::And => child_statuses.iter().all(|s| s.is_complete()),
+                    Operator::Or => child_statuses.iter().any(|s| s.is_complete()),
+                };
+                
+                // Check for overrides
+                if let Some(override_config) = &config.override_rule {
+                    if self.check_override_condition(project_id, override_config).await? {
+                        return Ok(GoalStatus {
+                            goal: goal.clone(),
+                            status: Status::Complete,
+                            override_applied: Some(override_config.reason.clone()),
+                            ..Default::default()
+                        });
+                    }
+                }
+                
+                Ok(GoalStatus {
+                    goal: goal.clone(),
+                    status: if is_complete { Status::Complete } else { Status::InProgress },
+                    child_statuses: Some(child_statuses),
+                    ..Default::default()
+                })
+            }
+            
+            _ => todo!()
+        }
+    }
+}
+```
+
+### 4.5 Transitions
 
 ```
 Transition
@@ -295,7 +671,7 @@ TransitionCondition
 └── metadata: object
 ```
 
-### 4.5 Preventing Duplicate Assignment
+### 4.6 Preventing Duplicate Assignment
 
 The scheduler MUST enforce:
 
@@ -335,41 +711,318 @@ Layout
 
 ### 5.2 Layout Configuration
 
-```
-LayoutComponent
-├── component_id: UUID
-├── component_type: string  # Registry key (e.g., "core/text-input", "custom/ner-tagger")
-├── instance_id: string  # Unique within layout
-├── position: Position  # Grid or flex positioning
-├── props: object  # Component-specific configuration
-├── data_binding: string  # JSONPath to input data
-├── output_key: string  # Key in annotation output
-├── visibility_condition: string  # Expression for conditional rendering
-└── children: LayoutComponent[]  # For container components
+Layouts are defined using an **HTML/JSX-like markup language** that maps directly to React components. This provides:
+- Familiar syntax for frontend developers
+- Clear visual hierarchy
+- Strong tooling support (syntax highlighting, validation, autocomplete)
+- Direct mapping to rendered components
+
+#### 5.2.1 Layout Definition Language (LDL)
+
+```xml
+<!-- Layout definition for Clinical NER annotation -->
+<Layout id="clinical-ner-v1" name="Clinical NER Layout" version="1">
+  
+  <!-- Document display section -->
+  <Section direction="column" gap="md">
+    <Header level="3">Source Document</Header>
+    
+    <TextDisplay 
+      bind:source="$.input.document_text"
+      format="plain"
+      :highlight="$.ui_context.ai_highlights"
+    />
+  </Section>
+
+  <!-- Main annotation area -->
+  <Section direction="column" gap="lg" flex="1">
+    <Header level="3">Entity Annotation</Header>
+    
+    <NERTagger
+      bind:source="$.input.document_text"
+      bind:value="$.output.entities"
+      :allow-overlapping="false"
+    >
+      <EntityType name="Diagnosis" color="#FF6B6B" hotkey="d" />
+      <EntityType name="Medication" color="#4ECDC4" hotkey="m" />
+      <EntityType name="Procedure" color="#45B7D1" hotkey="p" />
+      <EntityType name="Anatomy" color="#96CEB4" hotkey="a" />
+    </NERTagger>
+    
+    <!-- Show AI suggestions if available -->
+    <Show when="$.ui_context.ai_predictions">
+      <AISuggestions 
+        bind:predictions="$.ui_context.ai_predictions"
+        on:accept="applyPrediction"
+      />
+    </Show>
+  </Section>
+
+  <!-- Metadata section -->
+  <Section direction="row" gap="md">
+    <Select
+      bind:value="$.output.confidence"
+      label="Confidence Level"
+      required="true"
+      flex="1"
+    >
+      <Option value="high">High - Very confident</Option>
+      <Option value="medium">Medium - Some uncertainty</Option>
+      <Option value="low">Low - Significant uncertainty</Option>
+    </Select>
+    
+    <TextArea
+      bind:value="$.output.notes"
+      label="Notes"
+      placeholder="Any additional observations..."
+      :rows="3"
+      flex="2"
+    />
+  </Section>
+
+</Layout>
 ```
 
-#### 5.2.1 Core Component Registry
+#### 5.2.2 Layout DSL Syntax
 
-| Component Type | Description | Props |
-|---------------|-------------|-------|
-| core/text-display | Read-only text display | format, highlight_ranges |
-| core/text-input | Text input field | multiline, max_length, placeholder |
-| core/text-area | Multi-line text input | rows, max_length |
-| core/select | Dropdown selection | options, multiple, searchable |
-| core/radio-group | Radio button group | options, layout |
-| core/checkbox-group | Checkbox group | options, min_selected, max_selected |
-| core/ner-tagger | Named entity recognition | entity_types, colors, allow_overlapping |
-| core/relation-annotator | Relation annotation | relation_types, entity_source |
-| core/bounding-box | Image bounding box | labels, min_boxes, max_boxes |
-| core/classification | Multi-label classification | labels, hierarchical |
-| core/comparison | Side-by-side comparison | sources, diff_mode |
-| core/previous-annotation | Display previous step output | step_id, editable |
-| core/agreement-display | Show annotation agreement | annotations, highlight_conflicts |
-| core/json-editor | Structured JSON editing | schema, ui_schema |
-| core/audio-player | Audio playback with regions | waveform, regions_enabled |
-| core/video-player | Video playback with frames | frame_extraction, timeline |
-| core/pdf-viewer | PDF document viewer | page_navigation, text_selection |
-| core/markdown-display | Rendered markdown | allow_html |
+**Data Binding:**
+```xml
+<!-- One-way binding from data source -->
+<TextDisplay bind:source="$.input.document_text" />
+
+<!-- Two-way binding for form inputs -->
+<TextInput bind:value="$.output.patient_name" />
+
+<!-- Reactive expressions (prefixed with :) -->
+<Panel :visible="$.output.entities.length > 0" />
+<Button :disabled="!$.validation.isValid" />
+```
+
+**Control Flow:**
+```xml
+<!-- Conditional rendering -->
+<Show when="$.context.has_previous_annotations">
+  <PreviousAnnotations bind:data="$.context.previous" />
+</Show>
+
+<Show when="$.input.document_type" equals="pdf">
+  <PDFViewer bind:source="$.input.document_url" />
+</Show>
+
+<!-- Fallback content -->
+<Show when="$.input.image_url" fallback={<Text>No image available</Text>}>
+  <ImageViewer bind:source="$.input.image_url" />
+</Show>
+
+<!-- Iteration -->
+<ForEach items="$.input.sentences" as="sentence" key="index">
+  <SentenceAnnotator 
+    bind:text="sentence.text"
+    bind:value="$.output.annotations[index]"
+  />
+</ForEach>
+
+<!-- Switch/case -->
+<Switch on="$.input.task_type">
+  <Case value="ner">
+    <NERTagger ... />
+  </Case>
+  <Case value="classification">
+    <Classification ... />
+  </Case>
+  <Default>
+    <Text>Unsupported task type</Text>
+  </Default>
+</Switch>
+```
+
+**Layout & Styling:**
+```xml
+<!-- Flexbox layouts -->
+<Section direction="row" gap="md" align="center" justify="between">
+  <Box flex="1">...</Box>
+  <Box flex="2">...</Box>
+</Section>
+
+<!-- Grid layouts -->
+<Grid columns="3" gap="lg">
+  <GridItem span="2">Wide content</GridItem>
+  <GridItem>Narrow content</GridItem>
+</Grid>
+
+<!-- Responsive breakpoints -->
+<Section 
+  direction="column" 
+  direction:md="row"
+  gap="sm"
+  gap:lg="md"
+>
+  ...
+</Section>
+```
+
+**Events:**
+```xml
+<!-- Event handlers (implemented in layout hooks) -->
+<Button on:click="submitAnnotation">Submit</Button>
+<TextInput on:change="validateField" on:blur="saveProgress" />
+
+<!-- Built-in events -->
+<NERTagger 
+  on:entity-add="onEntityAdded"
+  on:entity-remove="onEntityRemoved"
+  on:selection-change="onSelectionChange"
+/>
+```
+
+#### 5.2.3 Component Schema
+
+Each component has a strongly-typed schema:
+
+```typescript
+// Component definition with props schema
+interface NERTaggerProps {
+  // Data bindings
+  'bind:source': JSONPath;      // Text to annotate
+  'bind:value': JSONPath;       // Where to store entities
+  
+  // Configuration
+  'allow-overlapping'?: boolean;
+  'min-span-length'?: number;
+  'max-span-length'?: number;
+  'show-labels'?: boolean;
+  
+  // Children (entity type definitions)
+  children: EntityTypeElement[];
+}
+
+interface EntityTypeElement {
+  name: string;
+  color: CSSColor;
+  hotkey?: string;
+  description?: string;
+  validation?: {
+    pattern?: RegExp;
+    minLength?: number;
+    maxLength?: number;
+  };
+}
+```
+
+#### 5.2.4 Adjudication Layout Example
+
+```xml
+<Layout id="adjudication-v1" name="Adjudication Layout">
+  
+  <!-- Side-by-side comparison of annotations -->
+  <Section direction="row" gap="lg">
+    
+    <!-- Original task -->
+    <Panel flex="1" title="Source Document">
+      <TextDisplay bind:source="$.input.document_text" />
+    </Panel>
+    
+    <!-- All annotations to compare -->
+    <Panel flex="2" title="Annotations to Review">
+      <AnnotationComparison
+        bind:source="$.input.document_text"
+        bind:annotations="$.context.previous_annotations"
+        bind:resolution="$.output.resolved_entities"
+        highlight-conflicts="true"
+      >
+        <!-- Conflict resolution UI -->
+        <ConflictResolver 
+          mode="select-or-edit"
+          on:resolve="onConflictResolved"
+        />
+      </AnnotationComparison>
+    </Panel>
+    
+  </Section>
+  
+  <!-- Agreement metrics -->
+  <Section>
+    <AgreementDisplay 
+      bind:annotations="$.context.previous_annotations"
+      metrics="['krippendorff_alpha', 'percentage']"
+    />
+  </Section>
+  
+  <!-- Resolution notes -->
+  <Section>
+    <TextArea
+      bind:value="$.output.adjudication_notes"
+      label="Resolution Notes"
+      placeholder="Explain any significant decisions..."
+      required-when="$.context.has_conflicts"
+    />
+  </Section>
+  
+</Layout>
+```
+
+#### 5.2.5 Layout Compilation
+
+Layouts are compiled to React components at build time or runtime:
+
+```rust
+// crates/domain/layouts/src/compiler.rs
+
+pub struct LayoutCompiler {
+    component_registry: Arc<ComponentRegistry>,
+    validator: LayoutValidator,
+}
+
+impl LayoutCompiler {
+    /// Compile LDL markup to executable React component code
+    pub fn compile(&self, ldl_source: &str) -> Result<CompiledLayout> {
+        // 1. Parse LDL to AST
+        let ast = self.parse(ldl_source)?;
+        
+        // 2. Validate against component schemas
+        self.validator.validate(&ast)?;
+        
+        // 3. Generate React/TypeScript code
+        let react_code = self.generate_react(&ast)?;
+        
+        // 4. Extract data binding metadata
+        let bindings = self.extract_bindings(&ast)?;
+        
+        Ok(CompiledLayout {
+            id: ast.id,
+            react_code,
+            bindings,
+            required_components: ast.component_refs(),
+        })
+    }
+}
+```
+
+```typescript
+// Frontend: Runtime layout rendering
+function LayoutRenderer({ layoutId, taskData, onSubmit }: LayoutRendererProps) {
+  const { layout, isLoading } = useLayout(layoutId);
+  const [formState, setFormState] = useState({});
+  
+  // Create binding context
+  const bindingContext = useMemo(() => ({
+    input: taskData.input,
+    output: formState,
+    context: taskData.context,
+    ui_context: taskData.uiContext,
+    validation: validate(formState, layout.schema),
+  }), [taskData, formState, layout]);
+  
+  if (isLoading) return <LayoutSkeleton />;
+  
+  return (
+    <BindingProvider value={bindingContext} onChange={setFormState}>
+      <LayoutComponent layout={layout} />
+      <SubmitBar onSubmit={() => onSubmit(formState)} />
+    </BindingProvider>
+  );
+}
+```
 
 ### 5.3 Custom Components
 
@@ -1173,78 +1826,309 @@ WHERE status IN ('submitted', 'approved')
 GROUP BY user_id, project_id;
 ```
 
-### 7A.3 Scalability Architecture
+### 7A.3 Storage Architecture
 
-#### 7A.3.1 Write Path
+#### 7A.3.1 Design Principles
+
+1. **Postgres is the source of truth** — All annotation data writes go directly to PostgreSQL
+2. **Simple write path** — No intermediate queues or caches for writes
+3. **External background services** — Quality calculation, exports, and sync run as separate services
+4. **Redis for coordination only** — Sessions, locks, pub/sub, read caching
+
+#### 7A.3.2 System Architecture
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Annotation  │────▶│   API Server │────▶│    Redis     │
-│     UI       │     │              │     │  (Write-Ahead)│
-└──────────────┘     └──────────────┘     └──────┬───────┘
-                                                  │
-                     ┌──────────────┐              │
-                     │  Background  │◀─────────────┘
-                     │   Workers    │
-                     └──────┬───────┘
-                            │
-                     ┌──────▼───────┐
-                     │  PostgreSQL  │
-                     │ (Partitioned)│
-                     └──────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                           API Layer                                   │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐          │
+│  │  Annotation  │────▶│  API Server  │────▶│  PostgreSQL  │          │
+│  │     UI       │     │   (Axum)     │     │  (Primary)   │          │
+│  └──────────────┘     └──────┬───────┘     └──────┬───────┘          │
+│                              │                     │                  │
+│                              ▼                     │                  │
+│                       ┌──────────────┐             │                  │
+│                       │    Redis     │             │                  │
+│                       │ (coordination)│            │                  │
+│                       └──────────────┘             │                  │
+│                                                    │                  │
+└──────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────┐
+│                     Background Services                               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                       │
+│  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐          │
+│  │   Quality    │     │   Export     │     │  Warehouse   │          │
+│  │   Service    │     │   Service    │     │    Sync      │          │
+│  └──────┬───────┘     └──────┬───────┘     └──────┬───────┘          │
+│         │                    │                    │                  │
+│         └────────────────────┼────────────────────┘                  │
+│                              ▼                                        │
+│                       ┌──────────────┐     ┌──────────────┐          │
+│                       │  PostgreSQL  │     │      S3      │          │
+│                       │  (Replica)   │     │   (Exports)  │          │
+│                       └──────────────┘     └──────────────┘          │
+│                                                                       │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Immediate acknowledgment**: API accepts annotation, writes to Redis
-2. **Async persistence**: Background workers batch-write to PostgreSQL
-3. **Optimistic UI**: Client shows success immediately
-4. **Conflict resolution**: Version checks on final write
+#### 7A.3.3 Write Path
 
-#### 7A.3.2 Read Path (Hot Data)
+Direct writes to PostgreSQL — simple and reliable:
 
 ```rust
 // crates/domain/annotations/src/repository.rs
 
 impl AnnotationRepository {
-    /// Fetch annotations for active tasks (hot path)
-    pub async fn get_task_annotations(
+    pub async fn submit_annotation(
         &self,
-        task_id: Uuid,
-        step_id: Option<Uuid>,
-    ) -> Result<Vec<Annotation>> {
-        // Try cache first (Redis)
-        let cache_key = format!("annotations:task:{}:{}", task_id, step_id.unwrap_or_default());
-        
-        if let Some(cached) = self.cache.get(&cache_key).await? {
-            return Ok(serde_json::from_str(&cached)?);
-        }
-        
-        // Query database
-        let annotations = sqlx::query_as!(
+        annotation: NewAnnotation,
+    ) -> Result<Annotation> {
+        // Direct write to Postgres
+        let result = sqlx::query_as!(
             Annotation,
             r#"
-            SELECT annotation_id, task_id, step_id, user_id, data, status as "status: _",
-                   version, created_at, updated_at, submitted_at, quality_score
-            FROM annotations
-            WHERE task_id = $1 
-              AND ($2::uuid IS NULL OR step_id = $2)
-              AND status != 'superseded'
-            ORDER BY created_at DESC
+            INSERT INTO annotations 
+                (task_id, step_id, user_id, project_id, data, status, submitted_at, time_spent_ms)
+            VALUES ($1, $2, $3, $4, $5, 'submitted', NOW(), $6)
+            RETURNING *
             "#,
-            task_id,
-            step_id
+            annotation.task_id,
+            annotation.step_id,
+            annotation.user_id,
+            annotation.project_id,
+            annotation.data,
+            annotation.time_spent_ms,
         )
-        .fetch_all(&self.pool)
+        .fetch_one(&self.pool)
         .await?;
         
-        // Cache for 5 minutes
-        self.cache.set_ex(&cache_key, &serde_json::to_string(&annotations)?, 300).await?;
+        // Invalidate cached reads
+        self.cache.delete(&format!("task:{}:annotations", annotation.task_id)).await.ok();
         
-        Ok(annotations)
+        // Publish event for real-time updates and background processing
+        self.events.publish(AnnotationEvent::Submitted { 
+            annotation_id: result.annotation_id,
+            task_id: result.task_id,
+            project_id: result.project_id,
+        }).await?;
+        
+        Ok(result)
     }
 }
 ```
 
-#### 7A.3.3 Read Path (Export/Analytics - Cold Data)
+**Why this is sufficient:**
+- Annotators submit ~20-60 tasks/hour per person
+- Even 1,000 concurrent annotators = ~17 writes/second
+- PostgreSQL easily handles 10,000+ writes/second with proper tuning
+- No risk of data loss from intermediate buffer failures
+
+#### 7A.3.4 Redis Usage (Coordination Only)
+
+Redis is used for coordination and caching, **not** for the write path:
+
+| Use Case | Purpose |
+|----------|---------|
+| Session tokens | Fast auth lookup with natural TTL |
+| Task assignment locks | Distributed locks to prevent double-assignment |
+| Real-time presence | "User X is working on task Y" |
+| Event pub/sub | Broadcasting to WebSocket connections |
+| Read caching | Project configs, layouts, user permissions |
+| Rate limiting | API request throttling |
+
+```rust
+// Example: Task assignment with distributed lock
+impl TaskAssigner {
+    pub async fn assign_next_task(&self, user_id: Uuid, project_id: Uuid) -> Result<Option<Task>> {
+        // Acquire lock to prevent race conditions in assignment
+        let lock_key = format!("lock:assign:{}:{}", project_id, user_id);
+        let lock = self.redis.acquire_lock(&lock_key, Duration::from_secs(10)).await?;
+        
+        let _guard = scopeguard::guard(lock, |l| {
+            // Release lock when done
+            tokio::spawn(async move { l.release().await });
+        });
+        
+        // Find and assign task (reads/writes go to Postgres)
+        let task = self.find_eligible_task(user_id, project_id).await?;
+        
+        if let Some(task) = &task {
+            self.create_assignment(task.task_id, user_id).await?;
+        }
+        
+        Ok(task)
+    }
+}
+```
+
+#### 7A.3.5 Background Services
+
+Background processing runs as **external services** that connect to the database, not as database-embedded logic:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Background Services                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────┐   Each service is a standalone binary:     │
+│  │ Quality Service │   - Connects to Postgres read replica      │
+│  │                 │   - Subscribes to events via NATS/Redis    │
+│  │ - Event-driven  │   - Horizontally scalable                  │
+│  │ - Scheduled     │   - Independent deployment                 │
+│  └─────────────────┘                                            │
+│                                                                  │
+│  ┌─────────────────┐                                            │
+│  │ Export Service  │                                            │
+│  │                 │                                            │
+│  │ - On-demand     │                                            │
+│  │ - Scheduled     │                                            │
+│  └─────────────────┘                                            │
+│                                                                  │
+│  ┌─────────────────┐                                            │
+│  │ Notification    │                                            │
+│  │ Service         │                                            │
+│  │                 │                                            │
+│  │ - Webhooks      │                                            │
+│  │ - Email         │                                            │
+│  │ - Slack         │                                            │
+│  └─────────────────┘                                            │
+│                                                                  │
+│  ┌─────────────────┐                                            │
+│  │ Warehouse Sync  │                                            │
+│  │ Service         │                                            │
+│  │                 │                                            │
+│  │ - CDC-based     │                                            │
+│  │ - Incremental   │                                            │
+│  └─────────────────┘                                            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Quality Service Example:**
+
+```rust
+// services/quality-service/src/main.rs
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let config = Config::from_env()?;
+    
+    // Connect to Postgres (preferably read replica for heavy queries)
+    let db_pool = PgPoolOptions::new()
+        .max_connections(config.db_max_connections)
+        .connect(&config.database_url)
+        .await?;
+    
+    // Subscribe to annotation events
+    let nats = async_nats::connect(&config.nats_url).await?;
+    let mut subscription = nats.subscribe("annotations.submitted").await?;
+    
+    // Also run scheduled evaluations
+    let scheduler = JobScheduler::new().await?;
+    scheduler.add(Job::new_async("0 */15 * * * *", |_, _| {
+        Box::pin(async move {
+            run_scheduled_evaluations().await;
+        })
+    })?).await?;
+    scheduler.start().await?;
+    
+    // Process events
+    while let Some(msg) = subscription.next().await {
+        let event: AnnotationEvent = serde_json::from_slice(&msg.payload)?;
+        
+        match event {
+            AnnotationEvent::Submitted { annotation_id, task_id, project_id } => {
+                // Check if this task now has enough annotations to evaluate
+                let config = get_quality_config(&db_pool, project_id).await?;
+                let annotations = get_task_annotations(&db_pool, task_id).await?;
+                
+                if should_evaluate(&config, &annotations) {
+                    let result = evaluate_task(&db_pool, task_id, &config).await?;
+                    save_quality_score(&db_pool, &result).await?;
+                    
+                    // Publish quality evaluated event
+                    nats.publish("quality.evaluated", serde_json::to_vec(&result)?).await?;
+                }
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+**Export Service Example:**
+
+```rust
+// services/export-service/src/main.rs
+
+#[tokio::main]
+async fn main() -> Result<()> {
+    let config = Config::from_env()?;
+    let db_pool = connect_db(&config).await?;
+    let s3 = create_s3_client(&config).await?;
+    let nats = async_nats::connect(&config.nats_url).await?;
+    
+    let mut subscription = nats.subscribe("exports.requested").await?;
+    
+    while let Some(msg) = subscription.next().await {
+        let request: ExportRequest = serde_json::from_slice(&msg.payload)?;
+        
+        // Update status to processing
+        update_export_status(&db_pool, request.export_id, ExportStatus::Processing).await?;
+        
+        // Stream annotations and write to Parquet
+        let result = export_to_parquet(&db_pool, &s3, &request).await;
+        
+        match result {
+            Ok(export_result) => {
+                update_export_status(&db_pool, request.export_id, ExportStatus::Completed).await?;
+                nats.publish("exports.completed", serde_json::to_vec(&export_result)?).await?;
+            }
+            Err(e) => {
+                update_export_status(&db_pool, request.export_id, ExportStatus::Failed).await?;
+                tracing::error!(export_id = %request.export_id, error = %e, "Export failed");
+            }
+        }
+    }
+    
+    Ok(())
+}
+```
+
+#### 7A.3.6 Event Flow
+
+```
+┌──────────┐     ┌──────────┐     ┌──────────┐     ┌──────────────────┐
+│   API    │────▶│ Postgres │     │   NATS   │────▶│ Background       │
+│  Server  │     │          │     │          │     │ Services         │
+└────┬─────┘     └──────────┘     └────▲─────┘     └──────────────────┘
+     │                                 │
+     └─────────────────────────────────┘
+           Publish event after
+           successful DB write
+```
+
+Events are published **after** successful database commits:
+
+```rust
+pub async fn submit_annotation(&self, annotation: NewAnnotation) -> Result<Annotation> {
+    // 1. Write to database
+    let result = self.insert_annotation(&annotation).await?;
+    
+    // 2. Only publish event after successful commit
+    // If this fails, the annotation is still saved (eventual consistency for downstream)
+    if let Err(e) = self.events.publish("annotations.submitted", &result).await {
+        tracing::warn!(error = %e, "Failed to publish event, background processing may be delayed");
+        // Don't fail the request - data is safe in Postgres
+    }
+    
+    Ok(result)
+}
+```
 
 ```rust
 // crates/infrastructure/src/export.rs
@@ -1575,6 +2459,392 @@ data_lifecycle:
 ---
 
 ## 8. Dashboard & Reporting
+
+### 8.0 Workflow Interaction UI
+
+#### 8.0.1 Project Workflow View
+
+When a user opens a project, they see an interactive DAG visualization of the workflow:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Project: Clinical NER Annotation                                           │
+│  Overall Progress: 67% (3,350 / 5,000 tasks)                               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│                         ┌──────────────┐                                    │
+│                         │   Annotate   │                                    │
+│                         │    (NER)     │                                    │
+│                         │  ▓▓▓▓▓▓░░ 72%│                                    │
+│                         └──────┬───────┘                                    │
+│                                │                                            │
+│                                ▼                                            │
+│                         ┌──────────────┐                                    │
+│                         │  Agreement   │                                    │
+│                         │    Check     │                                    │
+│                         │  ▓▓▓▓▓░░░ 65%│                                    │
+│                         └──────┬───────┘                                    │
+│                               ╱ ╲                                           │
+│                    ≥90%      ╱   ╲     <90%                                 │
+│                             ╱     ╲                                         │
+│                            ▼       ▼                                        │
+│             ┌──────────────┐       ┌──────────────┐                         │
+│             │  ✓ Complete  │       │ Adjudication │                         │
+│             │              │       │              │                         │
+│             │  ▓▓▓▓▓░░░ 58%│       │  ▓▓▓░░░░░ 34%│  ← greyed out           │
+│             └──────────────┘       └──────────────┘    (no access)          │
+│                                                                             │
+│  Legend: ▓ Complete  ░ Remaining  [Click step to begin]                    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 8.0.2 Step Box Component
+
+```xml
+<StepBox 
+  bind:step="step"
+  bind:userAccess="access"
+  on:click="handleStepClick"
+>
+  <!-- Visual states based on access and progress -->
+  <Box 
+    :class="{
+      'step-box': true,
+      'step-accessible': access.canWork,
+      'step-greyed': !access.canWork,
+      'step-complete': step.progress >= 1.0,
+      'step-active': step.hasAssignedTasks
+    }"
+  >
+    <!-- Step icon based on type -->
+    <StepIcon :type="step.type" />
+    
+    <!-- Step name -->
+    <Text variant="heading" size="sm">{step.name}</Text>
+    
+    <!-- Progress bar -->
+    <ProgressBar 
+      :value="step.progress" 
+      :color="access.canWork ? 'primary' : 'muted'"
+    />
+    
+    <!-- Progress text -->
+    <Text size="xs" color="muted">
+      {formatPercent(step.progress)} ({step.completedTasks} / {step.totalTasks})
+    </Text>
+    
+    <!-- Access indicator -->
+    <Show when="!access.canWork">
+      <Tooltip content={access.reason}>
+        <LockIcon size="sm" />
+      </Tooltip>
+    </Show>
+    
+    <!-- Active task indicator for annotators -->
+    <Show when="access.canWork && step.userAssignedCount > 0">
+      <Badge variant="info">{step.userAssignedCount} assigned to you</Badge>
+    </Show>
+  </Box>
+</StepBox>
+```
+
+#### 8.0.3 Access Control Display
+
+Steps are displayed differently based on user permissions:
+
+| User Access | Visual State | Click Behavior |
+|-------------|--------------|----------------|
+| Can work on step | Full color, clickable | Opens task or task list |
+| Has view-only access | Muted color, clickable | Opens read-only task list |
+| No access | Greyed out, non-clickable | Tooltip explains why |
+| Step not yet reachable | Faded, dashed border | "Waiting for previous step" |
+
+**Access reasons displayed in tooltip:**
+- "Requires skill: Medical Coding (Expert)"
+- "Requires role: Adjudicator"
+- "Restricted to Team: Quality Review"
+- "Step not yet active"
+- "You have reached max concurrent tasks"
+
+#### 8.0.4 Annotator Click Behavior
+
+When an **annotator** clicks an accessible step:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  [← Back to Workflow]                    Task 1 of 12 assigned  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                                                             ││
+│  │                   [ANNOTATION LAYOUT]                       ││
+│  │                                                             ││
+│  │              (Rendered from Layout DSL)                     ││
+│  │                                                             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Skip]  [Save Draft]              [Submit & Next →]           │
+│                                                                 │
+│  Keyboard: Ctrl+Enter to submit, Ctrl+S to save, Esc to skip   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Task assignment flow:**
+
+```rust
+// When annotator clicks a step
+async fn handle_annotator_step_click(
+    user_id: Uuid,
+    step_id: Uuid,
+    project_id: Uuid,
+) -> Result<AnnotatorStepResponse> {
+    // Check for existing assigned tasks first
+    let assigned = get_user_assigned_tasks(user_id, step_id).await?;
+    
+    if !assigned.is_empty() {
+        // Resume existing assignment
+        return Ok(AnnotatorStepResponse::OpenTask { 
+            task: assigned[0].clone(),
+            queue_position: 1,
+            queue_total: assigned.len(),
+        });
+    }
+    
+    // Try to assign a new task
+    let new_task = assign_next_task(user_id, step_id, project_id).await?;
+    
+    match new_task {
+        Some(task) => Ok(AnnotatorStepResponse::OpenTask { 
+            task,
+            queue_position: 1,
+            queue_total: 1,
+        }),
+        None => Ok(AnnotatorStepResponse::NoTasksAvailable {
+            reason: "All tasks are assigned or completed",
+            estimated_availability: estimate_next_available(step_id).await?,
+        }),
+    }
+}
+```
+
+#### 8.0.5 Admin Click Behavior
+
+When an **admin** clicks any step:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  [← Back to Workflow]           Step: Adjudication           [⚙️ Settings]  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Progress: 340 / 1,000 (34%)    Active Annotators: 5    Avg Time: 4.2 min  │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  Filter: [All States ▼] [All Users ▼] [Date Range ▼]    🔍 Search tasks... │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │ □  Task ID        State        Assigned To    Started      Duration    ││
+│  ├─────────────────────────────────────────────────────────────────────────┤│
+│  │ □  TSK-00421     🟡 In Progress  J. Smith     10:42 AM     23 min ⚠️   ││
+│  │ □  TSK-00422     🟡 In Progress  M. Johnson   10:58 AM      7 min      ││
+│  │ □  TSK-00423     🔵 Assigned     K. Williams  11:02 AM      3 min      ││
+│  │ □  TSK-00424     ⚪ Pending      —            —            —           ││
+│  │ □  TSK-00425     ⚪ Pending      —            —            —           ││
+│  │ □  TSK-00426     🟢 Completed    A. Davis     09:15 AM     5.2 min     ││
+│  │ □  TSK-00427     🟢 Completed    J. Smith     09:22 AM     4.8 min     ││
+│  │    ...                                                                  ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+│                                                                             │
+│  Showing 1-50 of 1,000                              [← Prev] [Next →]      │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  With selected (2): [Reassign ▼]  [Change Priority]  [Export]              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Admin task actions:**
+
+| Action | Description | Confirmation Required |
+|--------|-------------|-----------------------|
+| **View** | Open task in read-only mode | No |
+| **Reassign** | Move task to different user | Yes, if in progress |
+| **Evict** | Remove user, return to pool | Yes, warns about lost work |
+| **Force Complete** | Mark task complete (admin override) | Yes, requires reason |
+| **Reset** | Clear annotations, restart step | Yes, requires reason |
+| **Change Priority** | Adjust task priority | No |
+| **Add Note** | Attach admin note to task | No |
+
+#### 8.0.6 Evict & Reassign Flow
+
+```xml
+<!-- Evict User Dialog -->
+<Dialog id="evict-dialog" title="Evict User from Task">
+  <Section direction="column" gap="md">
+    
+    <Alert variant="warning">
+      <Text>This will remove <Strong>{assignment.user.name}</Strong> from task 
+            <Strong>{task.id}</Strong> and discard any unsaved work.</Text>
+    </Alert>
+    
+    <InfoPanel>
+      <InfoRow label="Current Progress">{task.progress}%</InfoRow>
+      <InfoRow label="Time Spent">{formatDuration(assignment.duration)}</InfoRow>
+      <InfoRow label="Last Activity">{formatRelative(assignment.lastActivity)}</InfoRow>
+    </InfoPanel>
+    
+    <Select 
+      bind:value="evictReason" 
+      label="Reason for eviction" 
+      required="true"
+    >
+      <Option value="timeout">User exceeded time limit</Option>
+      <Option value="inactive">User inactive/unresponsive</Option>
+      <Option value="reassign_priority">Need to reassign to specialist</Option>
+      <Option value="user_request">User requested removal</Option>
+      <Option value="other">Other (specify below)</Option>
+    </Select>
+    
+    <Show when="evictReason === 'other'">
+      <TextArea 
+        bind:value="evictReasonText" 
+        label="Explain reason"
+        required="true"
+      />
+    </Show>
+    
+    <Divider />
+    
+    <RadioGroup bind:value="afterEvict" label="After eviction:">
+      <Radio value="pool">Return to task pool (auto-assign)</Radio>
+      <Radio value="assign">Assign to specific user</Radio>
+      <Radio value="hold">Hold for manual assignment</Radio>
+    </RadioGroup>
+    
+    <Show when="afterEvict === 'assign'">
+      <UserSelect 
+        bind:value="assignToUser"
+        label="Assign to"
+        :filter="{ 
+          hasSkills: step.requiredSkills,
+          hasRoles: step.requiredRoles,
+          excludeUsers: [assignment.userId]  // Can't reassign to same user
+        }"
+      />
+    </Show>
+    
+  </Section>
+  
+  <DialogActions>
+    <Button variant="ghost" on:click="closeDialog">Cancel</Button>
+    <Button variant="destructive" on:click="confirmEvict">
+      Evict User
+    </Button>
+  </DialogActions>
+</Dialog>
+```
+
+#### 8.0.7 Task State Machine
+
+```
+                                    ┌─────────────┐
+                                    │   PENDING   │
+                                    └──────┬──────┘
+                                           │ assign
+                                           ▼
+                    ┌─────────────────────────────────────────┐
+                    │              ASSIGNED                    │
+                    │  (user has task, hasn't started)        │
+                    └──────┬──────────────────────┬───────────┘
+                           │ start                │ timeout/evict
+                           ▼                      │
+                    ┌─────────────┐               │
+                    │ IN_PROGRESS │◄──────────────┤
+                    │             │               │
+                    └──────┬──────┘               │
+                           │                      │
+           ┌───────────────┼───────────────┐      │
+           │ submit        │ save_draft    │      │
+           ▼               ▼               │      │
+    ┌─────────────┐ ┌─────────────┐        │      │
+    │  SUBMITTED  │ │    DRAFT    │────────┘      │
+    └──────┬──────┘ └─────────────┘                │
+           │                                       │
+           │ (workflow continues)                  ▼
+           ▼                              ┌─────────────┐
+    ┌─────────────┐                       │  RETURNED   │
+    │  COMPLETED  │                       │  TO POOL    │
+    └─────────────┘                       └─────────────┘
+```
+
+#### 8.0.8 Real-time Updates
+
+The workflow view updates in real-time via WebSocket:
+
+```typescript
+// Frontend: Real-time workflow updates
+function useWorkflowRealtime(projectId: string) {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    const ws = connectWebSocket(`/ws/projects/${projectId}/workflow`);
+    
+    ws.on('step.progress', (data: StepProgressEvent) => {
+      // Update step progress in cache
+      queryClient.setQueryData(
+        ['workflow', projectId, 'steps', data.stepId],
+        (old: Step) => ({ ...old, progress: data.progress, completedTasks: data.completedTasks })
+      );
+    });
+    
+    ws.on('task.assigned', (data: TaskAssignedEvent) => {
+      // Update task list if admin is viewing
+      queryClient.invalidateQueries(['workflow', projectId, 'steps', data.stepId, 'tasks']);
+    });
+    
+    ws.on('task.completed', (data: TaskCompletedEvent) => {
+      // Animate progress bar update
+      triggerProgressAnimation(data.stepId);
+    });
+    
+    return () => ws.disconnect();
+  }, [projectId]);
+}
+```
+
+```rust
+// Backend: Broadcast workflow events
+impl WorkflowEventBroadcaster {
+    pub async fn on_task_completed(&self, task: &Task, step: &WorkflowStep) {
+        // Calculate new progress
+        let progress = self.calculate_step_progress(step.step_id).await;
+        
+        // Broadcast to all users viewing this project
+        self.broadcast(
+            &format!("project:{}", task.project_id),
+            WorkflowEvent::StepProgress {
+                step_id: step.step_id,
+                progress: progress.percentage,
+                completed_tasks: progress.completed,
+                total_tasks: progress.total,
+            }
+        ).await;
+    }
+}
+```
+
+#### 8.0.9 Workflow View Permissions
+
+| Role | Can See | Can Click | Click Opens |
+|------|---------|-----------|-------------|
+| Annotator | All steps | Accessible steps only | Task annotation UI |
+| Reviewer | All steps | Review steps | Review UI |
+| Adjudicator | All steps | Adjudication steps | Adjudication UI |
+| Team Lead | All steps + metrics | All steps | Task list (read) or work UI |
+| Project Admin | All steps + metrics | All steps | Task management UI |
+| System Admin | Everything | Everything | Full management UI |
 
 ### 8.1 Dashboard Views
 
@@ -2089,11 +3359,11 @@ AuditLog
 | Frontend | TypeScript + React | Type safety, component ecosystem, developer productivity |
 | Plugin Runtime | JS (V8/Deno) + WASM | Flexibility for plugin authors, sandboxed execution |
 | API | REST + WebSocket | REST for CRUD, WebSocket for real-time updates |
-| Database | PostgreSQL | ACID compliance, JSONB support, proven at scale |
-| Cache | Redis | Session management, task queue, real-time pub/sub |
+| Database | PostgreSQL | ACID compliance, JSONB support, source of truth for all data |
+| Coordination | Redis | Sessions, distributed locks, pub/sub, read caching (not write path) |
 | Search | Meilisearch | Full-text search, typo tolerance, fast indexing |
-| Message Queue | NATS | Lightweight, high-performance event distribution |
-| Object Storage | S3-compatible | Document/image storage for annotation assets |
+| Message Bus | NATS | Event distribution to background services |
+| Object Storage | S3-compatible | Document/image storage, export artifacts |
 
 ### 13.2 Backend Architecture (Rust)
 
@@ -3293,111 +4563,552 @@ plugins:
 
 ### B.1 Medical Coding Workflow
 
-```yaml
-workflow:
-  name: "Medical Coding - Dual Annotation with Adjudication"
-  type: multi_adjudication
+```xml
+<Project id="medical-coding-q1" name="Medical Coding - Q1 2025">
   
-  steps:
-    - id: initial_coding
-      name: "Initial Coding"
-      type: annotation
-      annotators_required: 2
-      prevent_reassignment: true
-      layout: medical_coding_layout
-      required_skills:
-        - skill: medical_coding
-          min_proficiency: intermediate
-      hooks:
-        preProcess:
-          - id: ai-code-suggestions
-            handler: "@ensemble/ai-prefill"
-            config:
-              model: clinical-coder-v2
-              fields: [diagnosis_codes, procedure_codes]
-              
-    - id: agreement_check
-      name: "Agreement Check"
-      type: auto_process
-      handler: "@core/agreement-calculator"
-      config:
-        threshold: 0.9
-        
-    - id: adjudication
-      name: "Adjudication"
-      type: adjudication
-      layout: adjudication_layout
-      required_skills:
-        - skill: medical_coding
-          min_proficiency: expert
-      required_roles:
-        - adjudicator
-        
-  transitions:
-    - from: initial_coding
-      to: agreement_check
-      condition: { type: on_complete }
+  <!-- PROJECT-LEVEL GOALS -->
+  <Goals>
+    <Goal id="volume" type="volume" required="true">
+      <Name>Complete 10,000 Records</Name>
+      <Target>10000</Target>
+      <Unit>tasks</Unit>
+      <CountingRule>
+        <Status>completed</Status>
+        <DedupeBy>task</DedupeBy>
+      </CountingRule>
+    </Goal>
+    
+    <Goal id="quality" type="quality" required="true">
+      <Name>85% Inter-Annotator Agreement</Name>
+      <Metric>agreement:krippendorff_alpha</Metric>
+      <Threshold>0.85</Threshold>
+      <MinSampleSize>100</MinSampleSize>
+      <EvaluationWindow type="rolling" size="500" />
+      <MeasuredAt step="agreement_check" trigger="on_step_complete" />
+    </Goal>
+    
+    <Goal id="deadline" type="deadline" required="true">
+      <Name>Q1 Delivery</Name>
+      <Deadline>2025-03-31T23:59:59Z</Deadline>
+      <Warnings>
+        <Warning at="P14D">Two weeks remaining</Warning>
+        <Warning at="P3D">Three days remaining</Warning>
+      </Warnings>
+    </Goal>
+    
+    <!-- Project is complete when: (volume AND quality) OR deadline -->
+    <Goal id="project_complete" type="composite" required="true">
+      <Operator>or</Operator>
+      <Goals>
+        <CompositeGoal operator="and">
+          <GoalRef>volume</GoalRef>
+          <GoalRef>quality</GoalRef>
+        </CompositeGoal>
+        <GoalRef>deadline</GoalRef>
+      </Goals>
+    </Goal>
+  </Goals>
+  
+  <!-- WORKFLOW DEFINITION -->
+  <Workflow id="dual-annotation-adjudication" name="Dual Annotation with Adjudication">
+    <Steps>
       
-    - from: agreement_check
-      to: completed
-      condition: 
-        type: expression
-        expression: "$.agreement_score >= 0.9"
+      <!-- Step 1: Initial coding by 2 annotators -->
+      <Step id="initial_coding" name="Initial Coding" type="annotation">
+        <Layout ref="medical_coding_layout" />
         
-    - from: agreement_check
-      to: adjudication
-      condition:
-        type: expression
-        expression: "$.agreement_score < 0.9"
+        <!-- When can this task move forward? 2 annotators done. -->
+        <CompletionCriteria type="annotation_count">
+          <Count>2</Count>
+          <UniqueAnnotators>true</UniqueAnnotators>
+        </CompletionCriteria>
         
-    - from: adjudication
-      to: completed
-      condition: { type: on_complete }
+        <!-- How does this step contribute to project goals? -->
+        <GoalContributions>
+          <Contribution goal="volume">
+            <Type>count</Type>
+            <Metric>completed_tasks</Metric>
+            <Aggregation>sum</Aggregation>
+          </Contribution>
+          <Contribution goal="quality">
+            <Type>quality_metric</Type>
+            <Metric>pairwise_agreement</Metric>
+          </Contribution>
+        </GoalContributions>
+        
+        <Assignment>
+          <Mode>auto</Mode>
+          <PreventReassignment>true</PreventReassignment>
+          <RequiredSkills>
+            <Skill name="medical_coding" minProficiency="intermediate" />
+          </RequiredSkills>
+        </Assignment>
+        
+        <Hooks>
+          <PreProcess>
+            <Hook id="ai-suggestions" plugin="@ensemble/ai-prefill">
+              <Config>
+                <Model>clinical-coder-v2</Model>
+                <Fields>diagnosis_codes,procedure_codes</Fields>
+              </Config>
+            </Hook>
+          </PreProcess>
+        </Hooks>
+      </Step>
+      
+      <!-- Step 2: Automatic agreement check -->
+      <Step id="agreement_check" name="Agreement Check" type="auto_process">
+        <Handler>@core/agreement-calculator</Handler>
+        <Config>
+          <Metric>agreement:krippendorff_alpha</Metric>
+          <Threshold>0.9</Threshold>
+        </Config>
+        
+        <CompletionCriteria type="auto" />
+        
+        <!-- This step MEASURES quality but doesn't produce volume -->
+        <GoalContributions>
+          <Contribution goal="quality">
+            <Type>quality_metric</Type>
+            <Metric>calculated_agreement</Metric>
+            <Aggregation>latest</Aggregation>
+          </Contribution>
+        </GoalContributions>
+      </Step>
+      
+      <!-- Step 3: Adjudication for disagreements -->
+      <Step id="adjudication" name="Adjudication" type="adjudication">
+        <Layout ref="adjudication_layout" />
+        
+        <CompletionCriteria type="annotation_count">
+          <Count>1</Count>
+        </CompletionCriteria>
+        
+        <Assignment>
+          <Mode>auto</Mode>
+          <PreventReassignment>true</PreventReassignment>
+          <RequiredSkills>
+            <Skill name="medical_coding" minProficiency="expert" />
+          </RequiredSkills>
+          <RequiredRoles>
+            <Role>adjudicator</Role>
+          </RequiredRoles>
+        </Assignment>
+      </Step>
+      
+    </Steps>
+    
+    <Transitions>
+      <Transition from="initial_coding" to="agreement_check">
+        <Condition type="on_complete" />
+      </Transition>
+      
+      <Transition from="agreement_check" to="completed">
+        <Condition type="expression">
+          <Expression>$.step_output.agreement_score >= 0.9</Expression>
+        </Condition>
+      </Transition>
+      
+      <Transition from="agreement_check" to="adjudication">
+        <Condition type="expression">
+          <Expression>$.step_output.agreement_score &lt; 0.9</Expression>
+        </Condition>
+      </Transition>
+      
+      <Transition from="adjudication" to="completed">
+        <Condition type="on_complete" />
+      </Transition>
+    </Transitions>
+    
+  </Workflow>
+</Project>
 ```
 
-### B.2 NER Annotation Layout
+### B.2 Continuous Labeling Project (Volume + Deadline Goals)
 
-```yaml
-layout:
-  name: "Clinical NER Layout"
-  components:
-    - id: document_display
-      type: core/text-display
-      position: { row: 1, col: 1, width: 12 }
-      data_binding: "$.input.document_text"
-      props:
-        format: plain
+```xml
+<Project id="continuous-labeling-2025" name="Continuous Data Labeling">
+  
+  <Goals>
+    <!-- Volume goal: 50k annotations -->
+    <Goal id="volume" type="volume" required="true">
+      <Name>50,000 Labeled Items</Name>
+      <Target>50000</Target>
+      <Unit>annotations</Unit>
+      <CountingRule>
+        <Status>approved</Status>
+      </CountingRule>
+    </Goal>
+    
+    <!-- Deadline: end of Q1 -->
+    <Goal id="deadline" type="deadline" required="true">
+      <Deadline>2025-03-31T23:59:59Z</Deadline>
+    </Goal>
+    
+    <!-- Project done when volume reached OR deadline hits -->
+    <Goal id="complete" type="composite" required="true">
+      <Operator>or</Operator>
+      <Goals>
+        <GoalRef>volume</GoalRef>
+        <GoalRef>deadline</GoalRef>
+      </Goals>
+    </Goal>
+  </Goals>
+  
+  <Workflow id="label-review" name="Label with Review">
+    <Steps>
+      
+      <Step id="label" name="Label Data" type="annotation">
+        <Layout ref="classification_layout" />
         
-    - id: ner_tagger
-      type: core/ner-tagger
-      position: { row: 2, col: 1, width: 12 }
-      data_binding: "$.input.document_text"
-      output_key: "entities"
-      props:
-        entity_types:
-          - { name: "Diagnosis", color: "#FF6B6B" }
-          - { name: "Medication", color: "#4ECDC4" }
-          - { name: "Procedure", color: "#45B7D1" }
-          - { name: "Anatomy", color: "#96CEB4" }
-        allow_overlapping: false
+        <CompletionCriteria type="annotation_count">
+          <Count>1</Count>
+        </CompletionCriteria>
         
-    - id: confidence
-      type: core/select
-      position: { row: 3, col: 1, width: 6 }
-      output_key: "confidence"
-      props:
-        label: "Confidence Level"
-        options:
-          - { value: "high", label: "High" }
-          - { value: "medium", label: "Medium" }
-          - { value: "low", label: "Low" }
-          
-    - id: notes
-      type: core/text-area
-      position: { row: 3, col: 7, width: 6 }
-      output_key: "notes"
-      props:
-        label: "Notes"
-        placeholder: "Any additional observations..."
-        rows: 3
+        <GoalContributions>
+          <Contribution goal="volume">
+            <Type>count</Type>
+            <Metric>submitted_annotations</Metric>
+          </Contribution>
+        </GoalContributions>
+        
+        <Assignment>
+          <Mode>pool</Mode>
+          <LoadBalancing>quality_weighted</LoadBalancing>
+          <MaxConcurrentPerUser>10</MaxConcurrentPerUser>
+        </Assignment>
+      </Step>
+      
+      <!-- 10% sample review -->
+      <Step id="review" name="Quality Review" type="review">
+        <Layout ref="review_layout" />
+        <SampleRate>0.10</SampleRate>
+        
+        <CompletionCriteria type="review_decision" />
+        
+        <Assignment>
+          <RequiredRoles>
+            <Role>reviewer</Role>
+          </RequiredRoles>
+        </Assignment>
+      </Step>
+      
+    </Steps>
+    
+    <Transitions>
+      <Transition from="label" to="review">
+        <Condition type="sample" rate="0.10" />
+      </Transition>
+      <Transition from="label" to="completed">
+        <Condition type="on_complete" />
+      </Transition>
+      <Transition from="review" to="completed">
+        <Condition type="on_complete" />
+      </Transition>
+    </Transitions>
+  </Workflow>
+</Project>
+```
+
+### B.3 Quality-Driven NER Project
+
+```xml
+<Project id="ner-quality-driven" name="Clinical NER - Quality Driven">
+  
+  <Goals>
+    <!-- Primary goal: achieve and maintain high agreement -->
+    <Goal id="quality" type="quality" required="true">
+      <Name>90% Token-Level Agreement</Name>
+      <Metric>agreement:token_f1</Metric>
+      <Threshold>0.90</Threshold>
+      <MinSampleSize>200</MinSampleSize>
+      <EvaluationWindow type="rolling" size="500" />
+      <MeasuredAt step="annotate" trigger="on_step_complete" />
+      <SustainedPeriod>P7D</SustainedPeriod>  <!-- Must maintain for 7 days -->
+    </Goal>
+    
+    <!-- Minimum volume -->
+    <Goal id="min_volume" type="volume" required="true">
+      <Target>5000</Target>
+      <Unit>tasks</Unit>
+    </Goal>
+    
+    <!-- Manual signoff required -->
+    <Goal id="signoff" type="manual" required="true">
+      <AuthorizedRoles>
+        <Role>project_admin</Role>
+        <Role>data_science_lead</Role>
+      </AuthorizedRoles>
+      <Checklist>
+        <Item>Quality metrics sustained for 7+ days</Item>
+        <Item>Sample audit completed</Item>
+        <Item>Model training validated on dataset</Item>
+      </Checklist>
+    </Goal>
+    
+    <!-- Complete when: quality sustained AND min volume AND manual signoff -->
+    <Goal id="complete" type="composite" required="true">
+      <Operator>and</Operator>
+      <Goals>
+        <GoalRef>quality</GoalRef>
+        <GoalRef>min_volume</GoalRef>
+        <GoalRef>signoff</GoalRef>
+      </Goals>
+    </Goal>
+  </Goals>
+  
+  <Workflow id="dual-ner" name="Dual NER Annotation">
+    <Steps>
+      <Step id="annotate" name="NER Annotation" type="annotation">
+        <Layout ref="clinical-ner-v1" />
+        
+        <CompletionCriteria type="annotation_count">
+          <Count>2</Count>
+          <UniqueAnnotators>true</UniqueAnnotators>
+        </CompletionCriteria>
+        
+        <GoalContributions>
+          <Contribution goal="min_volume">
+            <Type>count</Type>
+            <Metric>completed_tasks</Metric>
+          </Contribution>
+          <Contribution goal="quality">
+            <Type>quality_metric</Type>
+            <Metric>token_f1_agreement</Metric>
+          </Contribution>
+        </GoalContributions>
+        
+        <ConsensusConfig>
+          <Metric>agreement:token_f1</Metric>
+          <Threshold>0.85</Threshold>
+          <OnAgreement action="complete" />
+          <OnDisagreement>
+            <Strategy>adjudication</Strategy>
+          </OnDisagreement>
+        </ConsensusConfig>
+      </Step>
+    </Steps>
+  </Workflow>
+</Project>
+```
+
+### B.4 NER Annotation Layout
+
+```xml
+<Layout id="clinical-ner-v1" name="Clinical NER Layout" version="1">
+  
+  <!-- Task metadata header -->
+  <Section direction="row" justify="between" padding="sm" background="subtle">
+    <Text bind:content="$.input.document_id" variant="mono" size="sm" />
+    <Badge bind:variant="$.input.priority">
+      <Text bind:content="$.input.priority" />
+    </Badge>
+  </Section>
+  
+  <!-- Main content area -->
+  <Section direction="column" gap="lg" padding="md" flex="1">
+    
+    <!-- Document display -->
+    <Panel title="Source Document" collapsible="false">
+      <TextDisplay 
+        bind:source="$.input.document_text"
+        format="plain"
+        :highlight-ranges="$.ui_context.ai_highlights"
+        font="reading"
+      />
+    </Panel>
+    
+    <!-- NER annotation -->
+    <Panel title="Entity Annotation" flex="1">
+      <NERTagger
+        bind:source="$.input.document_text"
+        bind:value="$.output.entities"
+        :allow-overlapping="false"
+        show-entity-count="true"
+      >
+        <EntityType name="Diagnosis" color="#FF6B6B" hotkey="d">
+          <Description>Medical diagnoses and conditions</Description>
+          <Examples>diabetes, hypertension, pneumonia</Examples>
+        </EntityType>
+        <EntityType name="Medication" color="#4ECDC4" hotkey="m">
+          <Description>Drug names and dosages</Description>
+          <Examples>metformin 500mg, lisinopril</Examples>
+        </EntityType>
+        <EntityType name="Procedure" color="#45B7D1" hotkey="p">
+          <Description>Medical procedures and tests</Description>
+          <Examples>MRI, blood panel, appendectomy</Examples>
+        </EntityType>
+        <EntityType name="Anatomy" color="#96CEB4" hotkey="a">
+          <Description>Body parts and anatomical structures</Description>
+          <Examples>left ventricle, femur, lungs</Examples>
+        </EntityType>
+      </NERTagger>
+      
+      <!-- AI suggestions panel -->
+      <Show when="$.ui_context.ai_predictions.length > 0">
+        <Divider margin="md" />
+        <AIAssistPanel 
+          bind:predictions="$.ui_context.ai_predictions"
+          on:accept="acceptPrediction"
+          on:reject="rejectPrediction"
+          title="AI Suggestions"
+        />
+      </Show>
+    </Panel>
+    
+  </Section>
+  
+  <!-- Bottom metadata -->
+  <Section direction="row" gap="md" padding="md">
+    <Select
+      bind:value="$.output.confidence"
+      label="Confidence"
+      required="true"
+      flex="1"
+    >
+      <Option value="high">High</Option>
+      <Option value="medium">Medium</Option>
+      <Option value="low">Low</Option>
+    </Select>
+    
+    <Select
+      bind:value="$.output.document_quality"
+      label="Document Quality"
+      flex="1"
+    >
+      <Option value="good">Good - Clear and complete</Option>
+      <Option value="fair">Fair - Some issues but usable</Option>
+      <Option value="poor">Poor - Significant problems</Option>
+    </Select>
+    
+    <TextArea
+      bind:value="$.output.notes"
+      label="Notes (optional)"
+      placeholder="Any issues or observations..."
+      :rows="2"
+      flex="2"
+    />
+  </Section>
+  
+  <!-- Validation messages -->
+  <Show when="$.validation.errors.length > 0">
+    <Alert variant="error" margin="md">
+      <ForEach items="$.validation.errors" as="error">
+        <Text bind:content="error.message" />
+      </ForEach>
+    </Alert>
+  </Show>
+  
+</Layout>
+```
+
+### B.5 Quality Evaluator Configuration
+
+```xml
+<QualityConfig project="medical-coding-project">
+  
+  <Evaluators>
+    <!-- Inter-annotator agreement -->
+    <Evaluator 
+      id="iaa" 
+      type="builtin" 
+      builtinType="agreement:krippendorff_alpha"
+      weight="0.4"
+    >
+      <Parameters>
+        <Metric>nominal</Metric>
+        <BootstrapSamples>1000</BootstrapSamples>
+        <MinAnnotations>2</MinAnnotations>
+      </Parameters>
+      <Scope level="field">
+        <Fields>$.diagnosis_codes,$.procedure_codes</Fields>
+      </Scope>
+    </Evaluator>
+    
+    <!-- Custom medical coding accuracy -->
+    <Evaluator 
+      id="coding_accuracy" 
+      type="plugin" 
+      pluginId="medical:coding_accuracy"
+      weight="0.4"
+    >
+      <Parameters>
+        <CodeSystem>ICD-10</CodeSystem>
+        <HierarchyCredit>true</HierarchyCredit>
+        <SpecificityWeight>0.3</SpecificityWeight>
+      </Parameters>
+    </Evaluator>
+    
+    <!-- Completeness check -->
+    <Evaluator 
+      id="completeness" 
+      type="builtin" 
+      builtinType="completeness:required_fields"
+      weight="0.2"
+    >
+      <Parameters>
+        <RequiredFields>
+          diagnosis_codes,
+          procedure_codes,
+          confidence
+        </RequiredFields>
+      </Parameters>
+    </Evaluator>
+  </Evaluators>
+  
+  <Aggregation method="weighted_mean">
+    <ExcludeBelowConfidence>0.5</ExcludeBelowConfidence>
+    <OutlierHandling>winsorize</OutlierHandling>
+  </Aggregation>
+  
+  <Scheduling trigger="on_submit">
+    <DelayAfterSubmit>PT5M</DelayAfterSubmit>
+    <BatchSize>50</BatchSize>
+    <ReevaluateOn>annotation.approved,annotation.rejected</ReevaluateOn>
+  </Scheduling>
+  
+  <Rules>
+    <Rule name="Low Quality Alert">
+      <Condition>
+        <Metric>overall</Metric>
+        <Operator>lt</Operator>
+        <Value>0.7</Value>
+        <Window>P1D</Window>
+        <MinSampleSize>20</MinSampleSize>
+        <Scope>user</Scope>
+      </Condition>
+      <Actions>
+        <Action type="alert">
+          <Channel>slack</Channel>
+          <Message>User quality dropped below 70%</Message>
+        </Action>
+        <Action type="notify">
+          <Target>team_lead</Target>
+        </Action>
+      </Actions>
+    </Rule>
+    
+    <Rule name="Auto-approve High Quality">
+      <Condition type="composite" operator="and">
+        <Condition>
+          <Metric>coding_accuracy</Metric>
+          <Operator>gte</Operator>
+          <Value>0.95</Value>
+        </Condition>
+        <Condition>
+          <Metric>completeness</Metric>
+          <Operator>eq</Operator>
+          <Value>1.0</Value>
+        </Condition>
+      </Condition>
+      <Actions>
+        <Action type="workflow_action">
+          <ActionName>auto_approve</ActionName>
+          <SkipReview>true</SkipReview>
+        </Action>
+      </Actions>
+    </Rule>
+  </Rules>
+  
+</QualityConfig>
 ```
