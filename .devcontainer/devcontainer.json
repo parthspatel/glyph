@@ -8,5 +8,12 @@
   },
   "image": "ghcr.io/cachix/devenv/devcontainer:latest",
   "overrideCommand": false,
-  "updateContentCommand": "devenv test"
+  "postCreateCommand": "direnv allow",
+  "postStartCommand": "devenv test",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "remoteEnv": {
+    "DIRENV_LOG_FORMAT": ""
+  }
 }
