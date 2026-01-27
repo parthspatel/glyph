@@ -1,12 +1,23 @@
 {
-  "customizations": {
-    "vscode": {
-      "extensions": [
-        "mkhl.direnv"
-      ]
+  "name": "Glyph Dev Container",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "args": {
+      "CLAUDE_CODE_VERSION": "latest"
     }
   },
-  "image": "ghcr.io/cachix/devenv/devcontainer:latest",
+  "runArgs": [
+    "--cap-add=NET_ADMIN",
+    "--cap-add=NET_RAW"
+  ],
   "overrideCommand": false,
-  "updateContentCommand": "devenv test"
+  "postCreateCommand": "direnv allow",
+  "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && devenv test",
+  "waitFor": "postStartCommand",
+  "containerEnv": {
+    "DEVCONTAINER": "true"
+  },
+  "remoteEnv": {
+    "DIRENV_LOG_FORMAT": ""
+  }
 }
