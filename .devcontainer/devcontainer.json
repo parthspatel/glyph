@@ -1,34 +1,20 @@
 {
-<<<<<<< HEAD
-  "customizations": {
-    "vscode": {
-      "extensions": ["anthropic.claude-code", "mkhl.direnv"],
-    },
-=======
   "name": "Glyph Dev Container",
   "build": {
     "dockerfile": "Dockerfile",
     "args": {
-      "CLAUDE_CODE_VERSION": "latest"
-    }
->>>>>>> origin/main
+      "CLAUDE_CODE_VERSION": "latest",
+    },
   },
-  "runArgs": [
-    "--cap-add=NET_ADMIN",
-    "--cap-add=NET_RAW"
-  ],
+  "runArgs": ["--cap-add=NET_ADMIN", "--cap-add=NET_RAW"],
   "overrideCommand": false,
-<<<<<<< HEAD
-  "updateContentCommand": "devenv test",
-=======
   "postCreateCommand": "direnv allow",
   "postStartCommand": "sudo /usr/local/bin/init-firewall.sh && devenv test",
   "waitFor": "postStartCommand",
   "containerEnv": {
-    "DEVCONTAINER": "true"
+    "DEVCONTAINER": "true",
   },
   "remoteEnv": {
-    "DIRENV_LOG_FORMAT": ""
-  }
->>>>>>> origin/main
+    "DIRENV_LOG_FORMAT": "",
+  },
 }
