@@ -49,27 +49,29 @@
 
 ---
 
-## Phase 2: Core Domain
+## Phase 2: Core Domain ✅
 
 **Goal**: Implement all domain models, database schema, and API skeleton.
 
 **Requirements Covered**: REQ-STORE-001, REQ-API-001 (partial)
 
+**Completed**: 2026-01-28
+
 ### Deliverables
-- [ ] All domain types in libs/domain (matching PRD §2-§7)
-- [ ] SQLx migrations for all tables (users, teams, projects, workflows, tasks, annotations, quality)
-- [ ] Repository trait definitions
-- [ ] PostgreSQL repository implementations
-- [ ] Database connection pooling
-- [ ] Axum router skeleton with versioned routes (/api/v1)
-- [ ] OpenAPI spec generation setup (utoipa)
-- [ ] TypeScript type generation (typeshare)
+- [x] All domain types in libs/domain (matching PRD §2-§7)
+- [x] SQLx migrations for all tables (users, teams, projects, workflows, tasks, annotations, quality)
+- [x] Repository trait definitions
+- [x] PostgreSQL repository implementations
+- [x] Database connection pooling
+- [x] Axum router skeleton with versioned routes (/api/v1)
+- [x] OpenAPI spec generation setup (utoipa)
+- [x] TypeScript type generation (typeshare)
 
 ### Success Criteria
-- All migrations run successfully
-- Domain types compile with full serde support
-- TypeScript types auto-generated
-- API skeleton returns 501 for unimplemented routes
+- [x] All migrations run successfully
+- [x] Domain types compile with full serde support
+- [x] TypeScript types auto-generated
+- [x] API skeleton returns 501 for unimplemented routes
 
 ---
 
