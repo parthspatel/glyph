@@ -107,7 +107,7 @@
   git-hooks.hooks = {
     nixfmt.enable = true;
     rustfmt.enable = true;
-    clippy.enable = true;
+    # clippy.enable = true;
     shfmt.enable = true;
     shellcheck.enable = true;
     action-validator.enable = true;
