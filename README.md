@@ -4,33 +4,42 @@ AI Data Annotation Platform - A full-stack annotation platform for building high
 
 ## Tech Stack
 
-- **Backend**: Rust (Axum) + PostgreSQL 16 + Redis + NATS
+- **Backend**: Rust (Axum) + PostgreSQL 16 + Redis
 - **Frontend**: TypeScript 5 / React 18 with pnpm
-- **Plugin Runtime**: WASM (wasmtime) + JavaScript (Deno)
-- **ML Services**: Python 3.12 (FastAPI)
-- **Templates**: Nunjucks/MDX layouts
+- **Plugin Runtime**: WASM (wasmtime)
+- **Templates**: Nunjucks layouts
 
 ## Project Structure
 
 ```
 glyph/
-├── crates/                      # Rust backend
+├── apps/                        # Deployable applications
+│   ├── api/                     # Axum HTTP API server
+│   ├── worker/                  # Background job processor
+│   ├── cli/                     # Administration CLI
+│   └── web/                     # React web application
+│
+├── libs/                        # Shared Rust libraries
 │   ├── domain/                  # Core domain models + enums
-│   ├── infrastructure/          # PostgreSQL, Redis, NATS
-│   ├── services/                # Business logic
-│   ├── plugins/                 # WASM + Deno runtime
-│   └── api/                     # Axum HTTP handlers
+│   ├── db/                      # PostgreSQL repository layer
+│   ├── auth/                    # JWT + Auth0 integration
+│   ├── common/                  # Shared utilities, tracing
+│   ├── workflow-engine/         # State machine engine
+│   ├── quality/                 # IAA metrics, scoring
+│   └── plugins/                 # WASM runtime
 │
-├── packages/                    # TypeScript/React frontend
-│   ├── @glyph/components/       # Tier 1 React components
-│   ├── @glyph/layout-runtime/   # Nunjucks/MDX renderer
-│   ├── @glyph/sdk/              # TypeScript SDK
-│   ├── @glyph/types/            # Shared types
-│   └── web/                     # Main web application
+├── packages/                    # TypeScript packages
+│   └── @glyph/
+│       ├── types/               # Shared types (typeshare)
+│       └── ui/                  # Component library
 │
-├── layouts/                     # Tier 2 Nunjucks templates
-├── services/                    # Python ML services
-├── migrations/                  # SQL migrations
+├── infrastructure/              # Deployment infrastructure
+│   ├── docker/                  # Dockerfiles
+│   ├── helm/                    # Kubernetes Helm charts
+│   ├── terraform/               # Azure infrastructure
+│   └── k3s/                     # Local K3s config
+│
+├── migrations/                  # SQLx migrations
 └── docs/                        # Documentation
 ```
 
@@ -70,19 +79,21 @@ glyph/
 |---------|-------------|
 | `dev` | Start all development servers |
 | `dev-api` | Start Rust API server only |
+| `dev-worker` | Start background worker |
 | `dev-web` | Start frontend dev server only |
 | `db-migrate` | Run database migrations |
 | `db-reset` | Reset and re-run all migrations |
+| `typegen` | Generate TypeScript types from Rust |
 | `cargo test` | Run Rust tests |
 | `pnpm test` | Run frontend tests |
 
 ## Architecture
 
-### Three-Tier Component System
+### Hybrid Monorepo
 
-1. **Tier 1 - React Components**: Core annotation components (NERTagger, Classification, BoundingBox, etc.)
-2. **Tier 2 - Nunjucks Templates**: Layout definitions that compose Tier 1 components
-3. **Tier 3 - ML Services**: AI suggestions, quality prediction, active learning
+- **apps/**: Deployable binaries and applications
+- **libs/**: Shared Rust libraries with workspace dependencies
+- **packages/**: TypeScript packages managed by pnpm workspaces
 
 ### Workflow Engine
 
@@ -91,10 +102,18 @@ Supports three workflow types:
 - `multi_adjudication`: Multiple annotators with consensus resolution
 - `custom`: DAG-based custom workflows
 
-## Documentation
+### Quality Management
 
-- [Product Requirements](docs/design/product-requirements.md)
-- [PRD Cheatsheet](docs/design/PRD-CHEATSHEET.md)
+- Cohen's Kappa, Krippendorff's Alpha for IAA
+- Gold standard tracking
+- Automated quality actions
+
+## CI/CD
+
+- GitHub Actions for build, test, lint
+- Docker multi-stage builds
+- Helm charts for Kubernetes deployment
+- Terraform for Azure infrastructure
 
 ## License
 
