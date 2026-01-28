@@ -1,0 +1,54 @@
+{
+  "version": "1.0.0",
+  "project": "glyph",
+  "milestone": "v1.0",
+  "workflow": {
+    "mode": "interactive",
+    "gates": {
+      "researcher": true,
+      "plan_checker": true,
+      "verifier": true
+    }
+  },
+  "agents": {
+    "profile": "balanced",
+    "profiles": {
+      "quality": {
+        "planning": "opus",
+        "execution": "opus",
+        "research": "sonnet",
+        "verification": "sonnet"
+      },
+      "balanced": {
+        "planning": "opus",
+        "execution": "sonnet",
+        "research": "sonnet",
+        "verification": "haiku"
+      },
+      "budget": {
+        "planning": "sonnet",
+        "execution": "sonnet",
+        "research": "haiku",
+        "verification": "haiku"
+      }
+    }
+  },
+  "planning": {
+    "commit_docs": true,
+    "search_gitignored": false
+  },
+  "team": {
+    "size": 9,
+    "composition": {
+      "frontend": 2,
+      "backend": 2,
+      "devops": 1,
+      "ai": 3
+    }
+  },
+  "infrastructure": {
+    "dev": "k3s",
+    "prod": "aks",
+    "iac": ["helm", "terraform"]
+  }
+}

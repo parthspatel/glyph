@@ -1,0 +1,17 @@
+apiVersion: v2
+name: glyph
+description: Glyph Data Annotation Platform - Umbrella Chart
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: api
+    version: "0.1.0"
+    repository: "file://../api"
+  - name: web
+    version: "0.1.0"
+    repository: "file://../web"
+  - name: worker
+    version: "0.1.0"
+    repository: "file://../worker"

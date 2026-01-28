@@ -88,6 +88,10 @@
       cargo run --package glyph-api
     '';
 
+    dev-worker.exec = ''
+      cargo run --package glyph-worker
+    '';
+
     dev-web.exec = ''
       pnpm --filter @glyph/web dev
     '';
@@ -100,6 +104,10 @@
       (cargo run --package glyph-api &)
       pnpm --filter @glyph/web dev
     '';
+
+    typegen.exec = ''
+      typeshare --lang typescript --output-file packages/@glyph/types/src/generated.ts libs/
+    '';
   };
 
   # Git hooks
@@ -107,8 +115,7 @@
   git-hooks.hooks = {
     nixfmt.enable = true;
     rustfmt.enable = true;
-    # clipp
-    # y.enable = true;
+    # clippy.enable = true;
     shfmt.enable = true;
     shellcheck.enable = true;
     action-validator.enable = true;
