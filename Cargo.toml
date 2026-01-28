@@ -61,7 +61,13 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # UUIDs and time
-uuid = { version = "1.11", features = ["v4", "serde"] }
+uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
+
+# HTTP types
+http = "1.2"
+
+# Error handling (RFC 7807)
+problem_details = { version = "0.4", features = ["axum"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # Plugin runtime

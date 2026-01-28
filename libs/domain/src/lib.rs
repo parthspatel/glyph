@@ -6,6 +6,7 @@
 pub mod annotation;
 pub mod enums;
 pub mod goal;
+pub mod ids;
 pub mod project;
 pub mod quality;
 pub mod task;
@@ -15,6 +16,7 @@ pub mod workflow;
 pub use annotation::*;
 pub use enums::*;
 pub use goal::*;
+pub use ids::*;
 pub use project::*;
 pub use quality::*;
 pub use task::*;
