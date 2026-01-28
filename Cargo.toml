@@ -67,7 +67,7 @@ uuid = { version = "1.11", features = ["v4", "v7", "serde"] }
 http = "1.2"
 
 # Error handling (RFC 7807)
-problem_details = { version = "0.4", features = ["axum"] }
+problem_details = { version = "0.9", features = ["axum"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # Plugin runtime
