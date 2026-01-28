@@ -1,0 +1,198 @@
+//! Per-operation repository errors
+//!
+//! Each repository operation has its own error type for precise error handling.
+
+use glyph_domain::{AnnotationId, ProjectId, TaskId, TeamId, UserId, WorkflowId};
+use thiserror::Error;
+
+// =============================================================================
+// User Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateUserError {
+    #[error("email already exists: {0}")]
+    EmailExists(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindUserError {
+    #[error("user not found: {0}")]
+    NotFound(UserId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateUserError {
+    #[error("user not found: {0}")]
+    NotFound(UserId),
+    #[error("email already exists: {0}")]
+    EmailExists(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum ListUsersError {
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+// =============================================================================
+// Team Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateTeamError {
+    #[error("team name already exists: {0}")]
+    NameExists(String),
+    #[error("leader not found: {0}")]
+    LeaderNotFound(UserId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindTeamError {
+    #[error("team not found: {0}")]
+    NotFound(TeamId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTeamError {
+    #[error("team not found: {0}")]
+    NotFound(TeamId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum TeamMembershipError {
+    #[error("team not found: {0}")]
+    TeamNotFound(TeamId),
+    #[error("user not found: {0}")]
+    UserNotFound(UserId),
+    #[error("user already a member")]
+    AlreadyMember,
+    #[error("user not a member")]
+    NotAMember,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+// =============================================================================
+// Project Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateProjectError {
+    #[error("project name already exists: {0}")]
+    NameExists(String),
+    #[error("workflow not found: {0}")]
+    WorkflowNotFound(WorkflowId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindProjectError {
+    #[error("project not found: {0}")]
+    NotFound(ProjectId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateProjectError {
+    #[error("project not found: {0}")]
+    NotFound(ProjectId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+// =============================================================================
+// Task Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateTaskError {
+    #[error("project not found: {0}")]
+    ProjectNotFound(ProjectId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindTaskError {
+    #[error("task not found: {0}")]
+    NotFound(TaskId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateTaskError {
+    #[error("task not found: {0}")]
+    NotFound(TaskId),
+    #[error("invalid status transition")]
+    InvalidStatusTransition,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+// =============================================================================
+// Annotation Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateAnnotationError {
+    #[error("task not found: {0}")]
+    TaskNotFound(TaskId),
+    #[error("user not found: {0}")]
+    UserNotFound(UserId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindAnnotationError {
+    #[error("annotation not found: {0}")]
+    NotFound(AnnotationId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateAnnotationError {
+    #[error("annotation not found: {0}")]
+    NotFound(AnnotationId),
+    #[error("annotation is not in draft status")]
+    NotDraft,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+// =============================================================================
+// Workflow Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum FindWorkflowError {
+    #[error("workflow not found: {0}")]
+    NotFound(WorkflowId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum CreateWorkflowError {
+    #[error("workflow name already exists: {0}")]
+    NameExists(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
