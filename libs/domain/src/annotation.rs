@@ -3,24 +3,24 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
-use uuid::Uuid;
 
 use crate::enums::{ActorType, AnnotationStatus};
+use crate::ids::{AnnotationId, AssignmentId, ProjectId, TaskId, UserId};
 
 /// An annotation created by a user
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Annotation {
-    pub annotation_id: Uuid,
-    pub task_id: Uuid,
+    pub annotation_id: AnnotationId,
+    pub task_id: TaskId,
     pub step_id: String,
-    pub user_id: Uuid,
-    pub assignment_id: Uuid,
-    pub project_id: Uuid,
+    pub user_id: UserId,
+    pub assignment_id: AssignmentId,
+    pub project_id: ProjectId,
     pub data: serde_json::Value,
     pub status: AnnotationStatus,
     pub version: i32,
-    pub parent_version_id: Option<Uuid>,
+    pub parent_annotation_id: Option<AnnotationId>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub submitted_at: Option<DateTime<Utc>>,
@@ -34,15 +34,15 @@ pub struct Annotation {
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnnotationEvent {
-    pub event_id: Uuid,
-    pub annotation_id: Uuid,
+    pub event_id: String,
+    pub annotation_id: AnnotationId,
     pub event_type: String,
     pub data_snapshot: serde_json::Value,
     pub changes: Option<serde_json::Value>,
-    pub actor_id: Uuid,
+    pub actor_id: String,
     pub actor_type: ActorType,
     pub occurred_at: DateTime<Utc>,
-    pub request_id: Option<Uuid>,
+    pub request_id: Option<String>,
     pub ip_address: Option<String>,
     pub user_agent: Option<String>,
 }

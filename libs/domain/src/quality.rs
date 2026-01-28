@@ -3,17 +3,18 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
-use uuid::Uuid;
 
 use crate::enums::QualityEntityType;
+use crate::ids::{AssignmentId, QualityScoreId, TaskId, UserId};
 
 /// A quality score for an entity
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QualityScore {
-    pub score_id: Uuid,
+    pub score_id: QualityScoreId,
     pub entity_type: QualityEntityType,
-    pub entity_id: Uuid,
+    /// Entity ID as string since it can reference different entity types
+    pub entity_id: String,
     pub score_type: String,
     pub value: f64,
     pub confidence: Option<f64>,
@@ -27,9 +28,9 @@ pub struct QualityScore {
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssignmentMetrics {
-    pub assignment_id: Uuid,
-    pub user_id: Uuid,
-    pub task_id: Uuid,
+    pub assignment_id: AssignmentId,
+    pub user_id: UserId,
+    pub task_id: TaskId,
     pub step_id: String,
 
     // Time metrics

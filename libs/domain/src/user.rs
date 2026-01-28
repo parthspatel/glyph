@@ -3,15 +3,15 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
-use uuid::Uuid;
 
 use crate::enums::{ProficiencyLevel, UserStatus};
+use crate::ids::UserId;
 
 /// A user in the system
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
-    pub user_id: Uuid,
+    pub user_id: UserId,
     pub email: String,
     pub display_name: String,
     pub status: UserStatus,

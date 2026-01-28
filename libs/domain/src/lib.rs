@@ -10,6 +10,7 @@ pub mod ids;
 pub mod project;
 pub mod quality;
 pub mod task;
+pub mod team;
 pub mod user;
 pub mod workflow;
 
@@ -20,5 +21,6 @@ pub use ids::*;
 pub use project::*;
 pub use quality::*;
 pub use task::*;
+pub use team::*;
 pub use user::*;
 pub use workflow::*;

@@ -18,6 +18,7 @@ pub enum UserStatus {
     Active,
     Inactive,
     Suspended,
+    Deleted,
 }
 
 /// Status of a task in the workflow
@@ -33,6 +34,7 @@ pub enum TaskStatus {
     Completed,
     Failed,
     Cancelled,
+    Deleted,
 }
 
 /// Status of an annotation
@@ -45,6 +47,7 @@ pub enum AnnotationStatus {
     Approved,
     Rejected,
     Superseded,
+    Deleted,
 }
 
 /// Status of a task assignment
@@ -104,6 +107,7 @@ pub enum ProjectStatus {
     Paused,
     Completed,
     Archived,
+    Deleted,
 }
 
 /// Type of project goal

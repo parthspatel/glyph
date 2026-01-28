@@ -2,18 +2,18 @@
 
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
-use uuid::Uuid;
 
 use crate::enums::{
     AssignmentMode, CompletionCriteriaType, ConsensusMethod, LoadBalancingStrategy,
     ResolutionStrategy, StepType, TimeoutAction, TransitionConditionType, WorkflowType,
 };
+use crate::ids::WorkflowId;
 
 /// A workflow definition
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workflow {
-    pub workflow_id: Uuid,
+    pub workflow_id: WorkflowId,
     pub name: String,
     pub workflow_type: WorkflowType,
     pub entry_step_id: String,

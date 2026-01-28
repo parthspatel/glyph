@@ -3,16 +3,16 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
-use uuid::Uuid;
 
 use crate::enums::{AssignmentStatus, StepStatus, TaskStatus};
+use crate::ids::{AssignmentId, ProjectId, TaskId, UserId};
 
 /// A task to be annotated
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Task {
-    pub task_id: Uuid,
-    pub project_id: Uuid,
+    pub task_id: TaskId,
+    pub project_id: ProjectId,
     pub status: TaskStatus,
     pub priority: i32,
     pub input_data: serde_json::Value,
@@ -57,10 +57,10 @@ pub struct WorkflowHistoryEntry {
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskAssignment {
-    pub assignment_id: Uuid,
-    pub task_id: Uuid,
+    pub assignment_id: AssignmentId,
+    pub task_id: TaskId,
     pub step_id: String,
-    pub user_id: Uuid,
+    pub user_id: UserId,
     pub status: AssignmentStatus,
     pub assigned_at: DateTime<Utc>,
     pub accepted_at: Option<DateTime<Utc>>,
