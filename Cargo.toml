@@ -1,15 +1,35 @@
 [workspace]
 resolver = "2"
-members = ["crates/*"]
+members = [
+    "apps/api",
+    "apps/worker",
+    "apps/cli",
+    "libs/domain",
+    "libs/db",
+    "libs/workflow-engine",
+    "libs/quality",
+    "libs/plugins",
+    "libs/auth",
+    "libs/common",
+]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Parth Patel <parthspatel.nj@gmail.com>"]
+authors = ["Glyph Team"]
 license = "MIT"
 repository = "https://github.com/parthpatel/glyph"
 
 [workspace.dependencies]
+# Internal crates
+glyph-domain = { path = "libs/domain" }
+glyph-db = { path = "libs/db" }
+glyph-workflow-engine = { path = "libs/workflow-engine" }
+glyph-quality = { path = "libs/quality" }
+glyph-plugins = { path = "libs/plugins" }
+glyph-auth = { path = "libs/auth" }
+glyph-common = { path = "libs/common" }
+
 # Async runtime
 tokio = { version = "1.43", features = ["full"] }
 async-trait = "0.1"
@@ -50,6 +70,9 @@ wasmtime = "28"
 # Configuration
 config = "0.14"
 dotenvy = "0.15"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
 
 # Testing
 mockall = "0.13"

@@ -9,7 +9,7 @@
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
-    "typegen": "typeshare --lang typescript --output-file packages/@glyph/types/src/generated.ts crates/",
+    "typegen": "typeshare --lang typescript --output-file packages/@glyph/types/src/generated.ts libs/",
     "clean": "pnpm -r clean"
   },
   "devDependencies": {

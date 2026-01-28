@@ -1,0 +1,22 @@
+//! Glyph Domain - Core domain models and types
+//!
+//! This crate contains all domain models, enums, and core business types
+//! used throughout the Glyph data annotation platform.
+
+pub mod annotation;
+pub mod enums;
+pub mod goal;
+pub mod project;
+pub mod quality;
+pub mod task;
+pub mod user;
+pub mod workflow;
+
+pub use annotation::*;
+pub use enums::*;
+pub use goal::*;
+pub use project::*;
+pub use quality::*;
+pub use task::*;
+pub use user::*;
+pub use workflow::*;

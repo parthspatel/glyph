@@ -1,0 +1,21 @@
+[package]
+name = "glyph-common"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "glyph_common"
+path = "src/lib.rs"
+
+[dependencies]
+config.workspace = true
+dotenvy.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true
