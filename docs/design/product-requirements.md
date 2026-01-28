@@ -1,6 +1,363 @@
 # Data Annotation Platform Requirements Specification
 
+## Executive Summary
+
+> **Section Summary:** The Executive Summary provides a high-level roadmap of the Data Annotation Platform, covering its 5-phase data lifecycle (ingestion → distribution → annotation → quality control → export), all 14 feature sections with their key models and enumerations, a cross-reference validation matrix tracking implementation status across SQL/Rust/WIT/TypeScript layers, and canonical definitions for all status enums to ensure consistency throughout the document.
+
+### Platform Overview
+
+The **Data Annotation Platform** is a comprehensive system for managing human annotation of data for machine learning. It handles the complete lifecycle:
+
+1. **Data Ingestion** → Tasks created from various sources (API, S3, databases)
+2. **Work Distribution** → Tasks assigned to qualified annotators based on skills
+3. **Annotation** → Annotators create labels using configurable UI layouts
+4. **Quality Control** → Reviews, adjudication, and quality scoring
+5. **Output** → Labeled data exported for ML training
+
+---
+
+### Feature Areas
+
+#### §1 Overview
+Design principles and system goals.
+
+#### §2 User & Team Management
+**Purpose**: Manage people, their capabilities, and their permissions.
+
+| Feature | Description |
+|---------|-------------|
+| **User Model** | Identity (user_id, email, display_name) with status tracking |
+| **Skills** | Domain expertise with proficiency levels (novice → expert) and certification |
+| **Roles** | Permission sets (annotator, reviewer, adjudicator, team_lead, team_manager, project_admin, system_admin) |
+| **RBAC Permissions** | Resource + action + scope (e.g., "can approve annotations in own team") |
+| **Teams** | Hierarchical groups with leader, manager, members, and specializations |
+| **Assignment Rules** | Automatic matching of tasks to qualified users with scoring algorithms |
+| **Quality Profiles** | Per-user historical quality metrics |
+
+**Key Models**: User, Skill, Role, Permission, Team, TeamMembership, AssignmentRule, QualityProfile
+
+---
+
+#### §3 Project & Project Types
+**Purpose**: Container for annotation work and reusable configurations.
+
+| Feature | Description |
+|---------|-------------|
+| **Project** | Single annotation effort with lifecycle (draft → active → paused → completed → archived) |
+| **ProjectType** | Reusable template defining schemas, skill requirements, and default workflow |
+| **Task Schema** | JSON Schema defining what input data looks like |
+| **Annotation Schema** | JSON Schema defining what annotations should contain |
+| **Skill Requirements** | Which skills (and proficiency) are needed to work on this project type |
+| **Data Sources** | Configuration for ingesting tasks (API, S3, database, manual upload) |
+| **Quality Criteria** | Minimum agreement, accuracy, and validation rules |
+
+**Key Models**: Project, ProjectType, DataSourceConfig, QualityCriteria
+
+---
+
+#### §4 Workflow Engine
+**Purpose**: Define how annotation work flows through stages.
+
+| Feature | Description |
+|---------|-------------|
+| **Workflow Types** | Predefined patterns: single, multi_vote, multi_adjudication, custom DAG |
+| **Workflow Steps** | Individual stages with type (annotation, review, adjudication, auto_process, conditional, sub_workflow) |
+| **Nested Workflows** | Workflows can reference other workflows as steps with clear entry/exit points |
+| **Step Completion Criteria** | When a task can proceed: annotation count, consensus, timeout handling |
+| **Transitions** | Conditional rules for moving between steps |
+| **Project Goals** | Targets: volume (task count), quality (accuracy), deadline, duration, composite |
+| **Goal Tracking** | Progress calculation, forecasting, threshold alerts |
+| **Duplicate Prevention** | Ensure same user doesn't annotate same task twice |
+
+**Key Models**: Workflow, WorkflowStep, Transition, StepCompletionCriteria, ConsensusConfig, ProjectGoal, GoalProgress
+
+**Key Enums**: step_type, goal_type
+
+---
+
+#### §5 Layout & Component System
+**Purpose**: Define the UI annotators see and interact with.
+
+| Feature | Description |
+|---------|-------------|
+| **Three-Tier Architecture** | Primitives → Composites → Annotation Layouts |
+| **Primitive Components** | Basic UI: TextInput, Select, Checkbox, Button, etc. |
+| **Composite Components** | Complex annotation: NERTagger, BoundingBox, Classification, RelationAnnotator |
+| **Layout Formats** | Templates: Nunjucks (like Jinja2), MDX (Markdown+JSX), TSX (full React) |
+| **Template Processing** | Data binding from task input to layout variables |
+| **Layout Schemas** | JSON Schema defining what data the layout collects |
+| **Validation** | Schema enforcement for annotations |
+| **Inheritance** | Base layouts with overrides |
+| **Versioning** | Track layout changes, migrations |
+
+**Key Models**: Layout, Component, ComponentRegistry, LayoutVersion
+
+**Key Enum**: layout_format (nunjucks, mdx, tsx)
+
+---
+
+#### §6 Task Management
+**Purpose**: Track individual units of work through their lifecycle.
+
+| Feature | Description |
+|---------|-------------|
+| **Task Model** | Unit of work with input data, workflow state, priority |
+| **Task Lifecycle** | pending → assigned → in_progress → review → adjudication → completed/failed/cancelled |
+| **Workflow State** | Current step, per-step state, context data |
+| **Task Assignment** | User assigned to task for specific step, with acceptance workflow |
+| **Assignment Lifecycle** | assigned → accepted → in_progress → submitted/expired/reassigned |
+| **Annotation** | The actual labeled data with versioning |
+| **Annotation Lifecycle** | draft → submitted → approved/rejected/superseded |
+| **Audit Trail** | Complete history of all changes with actor, timestamp, field changes |
+| **Time Tracking** | Duration spent on each annotation |
+
+**Key Models**: Task, WorkflowState, StepState, TaskAssignment, Annotation, AuditEntry, FieldChange
+
+**Key Enums**: task_status, assignment_status, annotation_status, step_status, actor_type
+
+---
+
+#### §7 Quality Management
+**Purpose**: Measure and ensure annotation quality.
+
+| Feature | Description |
+|---------|-------------|
+| **Quality Score Model** | Scores for tasks, users, and projects with confidence intervals |
+| **Task Quality** | Per-annotation quality based on agreement, review outcomes, gold comparison |
+| **User Quality** | Historical quality profile: accuracy, consistency, agreement rate |
+| **Quality Evaluators** | Configurable calculation methods |
+| **Inter-Annotator Agreement** | Cohen's Kappa, Fleiss' Kappa, percentage agreement |
+| **Gold Standard** | Comparison against known-correct annotations |
+| **Quality Actions** | Automated responses: reassignment, alerts, workflow triggers |
+
+**Key Models**: QualityScore, QualityEvaluator, QualityAction, QualityProfile
+
+---
+
+#### §7A Annotation Storage Architecture
+**Purpose**: PostgreSQL persistence layer with scalability and audit.
+
+| Feature | Description |
+|---------|-------------|
+| **Partitioning** | Tables partitioned by project_id for isolation and maintenance |
+| **JSONB Storage** | Flexible annotation data without schema migrations |
+| **Event Sourcing** | Append-only event log for complete audit trail |
+| **Materialized Views** | Pre-computed aggregations for reporting |
+| **Instrumentation** | Fine-grained interaction events for productivity analytics and ML training data |
+| **Indexes** | Optimized for common query patterns |
+| **Data Lifecycle** | Retention policies, archival, deletion |
+
+**Key Tables**: users, tasks, task_assignments, annotations, annotation_events, interaction_events, assignment_metrics, quality_scores
+
+**SQL Enum Types**: annotation_status, task_status, assignment_status, user_status, step_type, step_status, actor_type, project_status, goal_type, quality_entity_type, workflow_type, completion_criteria_type, consensus_method, resolution_strategy, assignment_mode, load_balancing_strategy, contribution_type, aggregation_type, transition_condition_type, timeout_action
+
+---
+
+#### §8 Dashboard & Reporting
+**Purpose**: UI for monitoring progress and managing work.
+
+| Feature | Description |
+|---------|-------------|
+| **Workflow UI** | Task queue, annotation interface, submission flow |
+| **Annotator Dashboard** | My tasks, my stats, my quality scores |
+| **Team Lead Dashboard** | Team tasks, team stats, workload balancing |
+| **Project Admin Dashboard** | Project progress, quality trends, goal tracking |
+| **System Admin Dashboard** | All projects, system health, user management |
+| **Rollup Hierarchy** | Aggregation: task → user → team → project → organization |
+| **Report Types** | Progress, quality, productivity reports |
+
+**Key Views**: DashboardConfig, ReportDefinition
+
+---
+
+#### §9 Extensibility & Hooks
+**Purpose**: Plugin system for customization without core changes.
+
+| Feature | Description |
+|---------|-------------|
+| **Workflow Hooks** | Pre/post entire workflow execution |
+| **Step Hooks** | Pre-process (AI prefill), post-process (external calls), validation |
+| **Assignment Hooks** | Custom routing logic |
+| **UI Hooks** | AI assist during annotation, live validation, data enrichment |
+| **Hook Registration** | Configuration per project/workflow/step |
+| **Built-in Hooks** | Library of common hooks |
+| **Plugin Runtimes** | WASM (sandboxed), JavaScript (Deno), React (frontend) |
+
+**Key Models**: Hook, HookConfig, PluginDefinition
+
+---
+
+#### §10 Integration & API
+**Purpose**: External system connectivity.
+
+| Feature | Description |
+|---------|-------------|
+| **REST API** | Full CRUD for all resources |
+| **WebSocket** | Real-time updates (assignments, notifications) |
+| **Event System** | Internal pub/sub for decoupling |
+| **Webhooks** | Push notifications to external systems |
+
+**Key Events**: task.created, annotation.submitted, quality.evaluated, etc.
+
+---
+
+#### §11 Security & Compliance
+**Purpose**: Authentication, authorization, audit, compliance.
+
+| Feature | Description |
+|---------|-------------|
+| **Authentication** | JWT-based with refresh tokens |
+| **SSO** | OAuth2/OIDC integration |
+| **Authorization** | RBAC from §2 enforced on all operations |
+| **Audit Logging** | All operations logged with actor, action, resource |
+| **Encryption** | At rest (AES-256) and in transit (TLS 1.3) |
+| **Compliance** | HIPAA, SOC2 features |
+
+---
+
+#### §12 Non-Functional Requirements
+**Purpose**: Performance, scalability, reliability targets.
+
+| Requirement | Target |
+|-------------|--------|
+| API Response Time | < 100ms p95 |
+| Concurrent Users | 10,000+ |
+| Uptime | 99.9% |
+| Data Durability | 99.999999999% |
+| RTO | < 4 hours |
+| RPO | < 1 hour |
+
+---
+
+#### §13 Technical Architecture
+**Purpose**: Implementation details and code structure.
+
+| Layer | Technology |
+|-------|------------|
+| Backend | Rust + Axum |
+| Database | PostgreSQL 15+ |
+| Cache | Redis 7+ |
+| Message Bus | NATS |
+| Frontend | React 18 + TypeScript 5 |
+| Plugin Runtime | WASM (wasmtime) + JavaScript (Deno) |
+
+**Subsections**:
+- §13.1: Directory structure
+- §13.2: Rust backend (Cargo.toml, domain models, services)
+- §13.3: React frontend (package.json, components, state management)
+- §13.4: Plugin system (WIT interfaces, WASM runtime, JS runtime, TypeScript SDK)
+- §13.5: Full implementation examples
+
+---
+
+### Core Data Models
+
+| Model | Canonical Definition | Key Fields | Implemented In |
+|-------|---------------------|------------|----------------|
+| User | §2.1 | user_id, email, skills[], roles[], quality_profile, availability | §13.2.3 (Rust) |
+| Team | §2.2 | team_id, members[], capacity, specializations | — |
+| Project | §3.1 | project_id, workflow_id, goals[], data_source | — |
+| ProjectType | §3.2 | type_id, task_schema, annotation_schema, skill_requirements | — |
+| Workflow | §4.1 | workflow_id, steps[], transitions[], hooks, settings | — |
+| WorkflowStep | §4.3 | step_id, type, layout_id, assignment_config, completion_criteria | — |
+| ProjectGoal | §4.4 | goal_id, type, target_value, deadline, progress | — |
+| Layout | §5.2 | layout_id, format, template_source, schema, settings | — |
+| Task | §6.1 | task_id, project_id, status, workflow_state, assignments[], annotations[] | §7A.2 (SQL), §13.2.3 (Rust), §13.4.2 (WIT), §13.4.5 (TS) |
+| TaskAssignment | §6.3 | assignment_id, task_id, step_id, user_id, status | §7A.2 (SQL), §13.2.3 (Rust), §13.4.5 (TS) |
+| Annotation | §6.4 | annotation_id, task_id, step_id, user_id, assignment_id, data, status, audit_trail[] | §7A.2 (SQL), §13.2.3 (Rust), §13.4.2 (WIT), §13.4.5 (TS) |
+| QualityScore | §7.1 | score_id, entity_type, entity_id, value, confidence | §7A.2 (SQL), §13.2.3 (Rust), §13.4.5 (TS) |
+
+---
+
+### Status Enumerations (Canonical Reference)
+
+All status enums must be consistent across: Domain Model (§2-§6), SQL Schema (§7A), Rust (§13.2), WIT (§13.4.2), TypeScript (§13.4.5).
+
+**Core Status Enums:**
+
+| Enum | Canonical Values | Notes |
+|------|------------------|-------|
+| `user_status` | active, inactive, suspended | User account state |
+| `task_status` | pending, assigned, in_progress, review, adjudication, completed, failed, cancelled | Task lifecycle (8 values) |
+| `annotation_status` | draft, submitted, approved, rejected, superseded | Annotation state (5 values) |
+| `assignment_status` | assigned, accepted, in_progress, submitted, expired, reassigned | Per-step assignment (6 values) |
+| `step_status` | pending, active, completed, skipped | Workflow step state (4 values) |
+| `step_type` | annotation, review, adjudication, auto_process, conditional, sub_workflow | Step classification (6 values) |
+| `project_status` | draft, active, paused, completed, archived | Project lifecycle (5 values) |
+| `goal_type` | volume, quality, deadline, duration, composite, manual | Goal classification (6 values) |
+| `layout_format` | nunjucks, mdx, tsx | Template language (3 values) — Domain only, not in SQL/Rust/TS |
+| `actor_type` | user, system, api | For audit trails (3 values) |
+
+**Workflow Configuration Enums (§4 Domain only):**
+
+| Enum | Canonical Values | Notes |
+|------|------------------|-------|
+| `workflow_type` | single, multi_vote, multi_adjudication, custom | Predefined workflow patterns |
+| `completion_criteria_type` | annotation_count, review_decision, auto, manual | When step completes |
+| `consensus_method` | majority_vote, weighted_vote, unanimous | How to determine agreed value |
+| `resolution_strategy` | majority_vote, weighted_vote, adjudication, additional_annotators, escalate | How to handle disagreement |
+| `assignment_mode` | auto, manual, pool | How tasks are assigned |
+| `load_balancing` | round_robin, least_loaded, quality_weighted | Assignment distribution strategy |
+| `contribution_type` | count, quality_metric, progress | How step contributes to goals |
+| `aggregation` | sum, latest, average, min, max | How to aggregate contributions |
+| `transition_condition_type` | always, on_complete, on_agreement, on_disagreement, expression | When transitions fire |
+| `timeout_action` | proceed, retry, escalate | What to do on step timeout |
+| `proficiency_level` | novice, intermediate, advanced, expert | Skill proficiency levels |
+
+---
+
+### Cross-Reference Validation Matrix
+
+This matrix tracks where each type is defined across all implementation layers.
+
+| Type | §2-§6 Domain | §7A SQL | §13.2 Rust | §13.4.2 WIT | §13.4.5 TS | Status |
+|------|--------------|---------|------------|-------------|------------|--------|
+| **Core Entities** |
+| User | §2.1 ✓ | — | ✓ | — | — | ✓ |
+| Team | §2.2 ✓ | — | — | — | — | ⚠️ Not implemented |
+| Project | §3.1 ✓ | — | — | — | — | ⚠️ Not implemented |
+| ProjectType | §3.2 ✓ | — | — | — | — | ⚠️ Not implemented |
+| Workflow | §4.1 ✓ | — | — | — | — | ⚠️ Not implemented |
+| WorkflowStep | §4.3 ✓ | — | — | — | — | ⚠️ Not implemented |
+| Layout | §5.2 ✓ | — | — | — | — | ⚠️ Not implemented |
+| Task | §6.1 ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| TaskAssignment | §6.3 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| Annotation | §6.4 ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| QualityScore | §7.1 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| **Status Enums** |
+| UserStatus | §2.1 ✓ | ✓ | ✓ | — | — | ✓ |
+| TaskStatus | §6.1 ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| AssignmentStatus | §6.3 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| AnnotationStatus | §6.4 ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| StepStatus | §6.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| StepType | §4.3 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| ActorType | §6.4 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| ProjectStatus | §3.1 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| GoalType | §4.4 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| **Workflow Configuration Enums** |
+| WorkflowType | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| CompletionCriteriaType | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| ConsensusMethod | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| ResolutionStrategy | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| AssignmentMode | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| LoadBalancingStrategy | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| ContributionType | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| AggregationType | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| TransitionConditionType | §4.3 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| TimeoutAction | §4.2 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| **Supporting Types** |
+| WorkflowState | §6.2 ✓ | — | ✓ | — | ✓ | ✓ |
+| StepState | §6.2 ✓ | — | ✓ | — | ✓ | ✓ |
+| AuditEntry | §6.4 ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| FieldChange | §6.4 ✓ | — | ✓ | — | ✓ | ✓ |
+
+**Legend**: ✓ = Defined, — = Not needed/applicable, ⚠️ = Gap to address
+
+---
+
 ## 1. Overview
+
+> **Section Summary:** This section establishes the platform's purpose as a customizable, workflow-driven data annotation system and defines five key design principles: configuration over code, extensibility via plugins, quality-first design with built-in metrics, scalability for distributed teams, and full auditability for compliance.
 
 ### 1.1 Purpose
 A customizable, workflow-driven data annotation platform supporting complex multi-step annotation processes with configurable layouts, RBAC, quality management, and extensibility hooks.
@@ -15,6 +372,8 @@ A customizable, workflow-driven data annotation platform supporting complex mult
 ---
 
 ## 2. User & Team Management
+
+> **Section Summary:** This section defines the people model for the platform, including Users with identity, skills (with proficiency levels from novice to expert), and seven hierarchical roles (annotator through system_admin). It covers the RBAC permission model with resource/action/scope granularity, Team structures with leaders/managers/members, automatic assignment rules with scoring algorithms, and supporting types for quality profiles, availability scheduling, and team capacity configuration.
 
 ### 2.1 User Model
 
@@ -103,6 +462,20 @@ TeamMembership
 └── active: boolean
 ```
 
+```
+TeamRole
+├── role_id: UUID
+├── user_id: UUID
+├── team_id: UUID
+├── role: Role                     # Reference to system Role (from §2.1.2)
+├── scope: enum(team_only, project_scoped)
+├── granted_at: timestamp
+├── granted_by: UUID
+└── expires_at: timestamp          # Optional expiration
+```
+
+> **Note:** `TeamMembership.team_role` defines the user's position in team hierarchy (member/lead/manager), while `Team.roles` (`TeamRole[]`) tracks which system Roles are assigned to users within this team context.
+
 #### 2.2.2 Team Responsibilities
 
 | Role | Knowledge Distribution | Task Management |
@@ -133,9 +506,58 @@ AssignmentRule
     └── cool_off_period: duration  # Time before reassigning same task type
 ```
 
+### 2.4 Supporting Types
+
+#### 2.4.1 Quality Profile
+
+```
+QualityProfile
+├── overall_score: float           # 0.0-1.0 aggregate quality score
+├── accuracy: float                # Historical accuracy rate
+├── consistency: float             # Consistency across similar tasks
+├── agreement_rate: float          # Agreement with other annotators
+├── sample_size: int               # Number of evaluated tasks
+├── last_evaluated: timestamp
+└── by_skill: Map<UUID, SkillQuality>  # Quality metrics per skill
+```
+
+#### 2.4.2 Availability Config
+
+```
+AvailabilityConfig
+├── schedule: WeeklySchedule       # Regular working hours
+├── timezone: string               # User's timezone (IANA format)
+├── max_concurrent_tasks: int      # Max tasks user can work on simultaneously
+├── daily_capacity: int            # Target tasks per day
+└── out_of_office: DateRange[]     # Planned unavailability periods
+```
+
+```
+WeeklySchedule
+├── monday: TimeRange[]
+├── tuesday: TimeRange[]
+├── wednesday: TimeRange[]
+├── thursday: TimeRange[]
+├── friday: TimeRange[]
+├── saturday: TimeRange[]
+└── sunday: TimeRange[]
+```
+
+#### 2.4.3 Capacity Config (Team)
+
+```
+CapacityConfig
+├── target_throughput: float       # Target tasks per day for team
+├── max_concurrent_tasks: int      # Max active tasks for entire team
+├── buffer_percentage: float       # Capacity buffer (e.g., 0.2 = 20%)
+└── auto_scale: boolean            # Allow overflow to other teams
+```
+
 ---
 
 ## 3. Project & Project Type Model
+
+> **Section Summary:** This section defines the container models for annotation work: Projects (with lifecycle states draft→active→paused→completed→archived, goals, and data sources) and ProjectTypes (reusable templates with task/annotation JSON schemas, skill requirements, and quality criteria). Supporting types include DataSourceConfig for ingestion (API, S3, database, manual), ProjectSettings for behavior configuration, and QualityCriteria for minimum agreement/accuracy thresholds.
 
 ### 3.1 Project
 
@@ -149,21 +571,12 @@ Project
 ├── workflow_id: UUID
 ├── created_by: UUID
 ├── created_at: timestamp
-├── targets: ProjectTarget
+├── goals: ProjectGoal[]           # Project-level objectives (see Section 4.4)
 ├── data_source: DataSourceConfig
 └── settings: ProjectSettings
 ```
 
-#### 3.1.1 Project Target
-
-```
-ProjectTarget
-├── quantity_target: int  # Total tasks to complete
-├── quality_target: float  # Minimum acceptable quality (0.0-1.0)
-├── deadline: timestamp
-├── throughput_target: float  # Tasks per hour/day
-└── agreement_threshold: float  # For multi-annotation (e.g., 0.8 = 80% agreement)
-```
+> **Note:** Project goals are fully defined in Section 4.4 with support for volume, quality, deadline, duration, and composite goal types.
 
 ### 3.2 Project Type
 
@@ -191,9 +604,48 @@ SkillRequirement
 └── weight: float  # For assignment scoring
 ```
 
+### 3.3 Supporting Types
+
+#### 3.3.1 Data Source Config
+
+```
+DataSourceConfig
+├── type: enum(api, s3, database, manual)
+├── connection: ConnectionConfig    # Type-specific connection details
+├── sync_mode: enum(batch, streaming, manual)
+├── schedule: string                # Cron expression for batch sync
+├── filters: DataFilter[]           # Optional filters on source data
+└── transform: TransformConfig      # Optional data transformation
+```
+
+#### 3.3.2 Project Settings
+
+```
+ProjectSettings
+├── notifications: NotificationConfig
+├── auto_assignment: boolean        # Enable automatic task assignment
+├── allow_self_assignment: boolean  # Allow users to claim tasks
+├── require_review: boolean         # All tasks require review step
+├── export_format: enum(json, csv, parquet)
+├── retention_days: int             # Data retention period
+└── custom_fields: CustomField[]    # Project-specific metadata fields
+```
+
+#### 3.3.3 Quality Criteria
+
+```
+QualityCriteria
+├── min_agreement: float            # Minimum inter-annotator agreement
+├── min_accuracy: float             # Minimum accuracy vs gold standard
+├── required_fields: string[]       # Fields that must be filled
+└── custom_validators: string[]     # Custom validation rule IDs
+```
+
 ---
 
 ## 4. Workflow Engine
+
+> **Section Summary:** This section defines the workflow system that orchestrates annotation work through configurable stages. It covers four predefined workflow types (single, multi_vote, multi_adjudication, custom DAG), six step types (annotation, review, adjudication, auto_process, conditional, sub_workflow), ConsensusConfig for handling multi-annotator agreement/disagreement, nested workflows for composition and reuse, step completion criteria and goal contributions, six project goal types (volume, quality, deadline, duration, composite, manual) with a Rust evaluation engine, conditional transitions, duplicate assignment prevention, and supporting types for settings, input/output mapping, and retry policies.
 
 ### 4.1 Workflow Model
 
@@ -202,11 +654,18 @@ Workflow
 ├── workflow_id: UUID
 ├── name: string
 ├── type: enum(single, multi_vote, multi_adjudication, custom)
+├── entry_step_id: UUID                 # Explicit entry point (for nested workflows)
+├── exit_step_ids: UUID[]               # Explicit exit points (for nested workflows)
 ├── steps: WorkflowStep[]
 ├── transitions: Transition[]
 ├── hooks: WorkflowHooks
 └── settings: WorkflowSettings
 ```
+
+**Entry/Exit Points**: Every workflow has explicit entry and exit points to support composition:
+- `entry_step_id`: The step where execution begins
+- `exit_step_ids`: Steps that represent successful completion (can have multiple for branching)
+- When used as a sub-workflow, the parent maps its context to the child's entry and collects output from exit steps
 
 ### 4.2 Predefined Workflow Types
 
@@ -238,6 +697,23 @@ Workflow
 | `additional_annotators` | Add more annotators until threshold met or max reached |
 | `escalate` | Flag for project admin review |
 
+**ConsensusConfig Model:**
+
+```
+ConsensusConfig
+├── metric: string                      # Agreement metric (e.g., "agreement:krippendorff_alpha")
+├── threshold: float                    # Agreement threshold (0.0-1.0)
+├── on_agreement: OnAgreementConfig
+│   ├── action: enum(complete, proceed_to_next)
+│   └── consensus_method: enum(majority_vote, weighted_vote, unanimous)
+└── on_disagreement: OnDisagreementConfig
+    ├── strategy: enum(majority_vote, weighted_vote, adjudication, additional_annotators, escalate)
+    ├── max_additional_annotators: int  # For additional_annotators strategy
+    └── fallback_strategy: enum(adjudication, escalate)  # If primary strategy fails
+```
+
+**Example:**
+
 ```xml
 <ConsensusConfig>
   <Metric>agreement:krippendorff_alpha</Metric>
@@ -245,7 +721,7 @@ Workflow
   
   <!-- When annotators agree -->
   <OnAgreement action="complete">
-    <ConsensusMethod>majority</ConsensusMethod>
+    <ConsensusMethod>majority_vote</ConsensusMethod>
   </OnAgreement>
   
   <!-- When they disagree -->
@@ -268,14 +744,118 @@ Workflow
 - Parallel steps supported
 - Custom merge logic
 
+#### 4.2.4 Nested Workflows (Sub-Workflows)
+
+Workflows can reference other workflows as steps, enabling composition and reuse:
+
+```
+[Parent Workflow]
+    │
+    ▼
+[Step 1: Annotate] → [Step 2: Sub-Workflow] → [Step 3: Review] → [Complete]
+                            │
+                            ▼
+                     ┌──────────────────────────────────────┐
+                     │  [Child Workflow]                    │
+                     │                                      │
+                     │  [Entry] → [NER] → [Linking] → [Exit]│
+                     │                                      │
+                     └──────────────────────────────────────┘
+```
+
+**Key concepts:**
+
+| Concept | Description |
+|---------|-------------|
+| **Entry Point** | Every workflow has exactly one entry step where execution begins |
+| **Exit Points** | One or more steps that represent successful completion |
+| **Context Passing** | Parent passes context to child via `input_mapping`; child returns via `output_mapping` |
+| **State Isolation** | Child workflow state is nested within parent's `workflow_state.sub_workflow_states[step_id]` |
+| **Recursion Limit** | Maximum nesting depth configurable (default: 5) to prevent infinite loops |
+
+**Sub-Workflow Step Configuration:**
+
+```
+SubWorkflowStep extends WorkflowStep
+├── type: sub_workflow
+├── sub_workflow_id: UUID               # Reference to child workflow
+├── input_mapping: InputMapping         # Map parent context → child entry
+├── output_mapping: OutputMapping       # Map child exit → parent context
+├── propagate_assignment: boolean       # Same user continues in child? (default: true)
+└── timeout: duration                   # Overall timeout for child workflow
+```
+
+**Example: Reusable NER + Entity Linking sub-workflow:**
+
+```yaml
+# Child workflow (reusable)
+workflow:
+  id: "ner-linking-workflow"
+  name: "NER with Entity Linking"
+  entry_step_id: "ner-step"
+  exit_step_ids: ["linking-complete"]
+  steps:
+    - id: "ner-step"
+      type: annotation
+      layout_id: "ner-layout"
+    - id: "linking-step"
+      type: annotation
+      layout_id: "entity-linking-layout"
+    - id: "linking-complete"
+      type: auto_process  # Merge results
+
+# Parent workflow
+workflow:
+  id: "document-processing"
+  steps:
+    - id: "classify"
+      type: annotation
+      layout_id: "classification-layout"
+    - id: "extract-entities"
+      type: sub_workflow
+      sub_workflow_id: "ner-linking-workflow"
+      input_mapping:
+        text: "$.output.classified_text"
+      output_mapping:
+        entities: "$.sub_workflow_output.entities"
+        links: "$.sub_workflow_output.links"
+    - id: "final-review"
+      type: review
+```
+
+**State representation for nested workflows:**
+
+```json
+{
+  "workflow_state": {
+    "current_step_id": "extract-entities",
+    "step_states": {
+      "classify": { "status": "completed", "output": {...} },
+      "extract-entities": { 
+        "status": "active",
+        "sub_workflow_state": {
+          "workflow_id": "ner-linking-workflow",
+          "current_step_id": "linking-step",
+          "step_states": {
+            "ner-step": { "status": "completed", "output": {...} },
+            "linking-step": { "status": "active" }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
 ### 4.3 Workflow Step
 
 ```
 WorkflowStep
 ├── step_id: UUID
 ├── name: string
-├── type: enum(annotation, review, adjudication, auto_process, conditional)
-├── layout_id: UUID
+├── type: enum(annotation, review, adjudication, auto_process, conditional, sub_workflow)
+├── layout_id: UUID                      # For annotation/review/adjudication steps
+├── sub_workflow_id: UUID                # For sub_workflow steps: reference to nested workflow
 ├── input_mapping: InputMapping
 ├── output_mapping: OutputMapping
 ├── assignment_config: StepAssignmentConfig
@@ -688,11 +1268,803 @@ The scheduler MUST enforce:
    └── outcome: enum(completed, skipped, timed_out, reassigned)
    ```
 
+### 4.7 Supporting Types
+
+#### 4.7.1 Workflow Settings
+
+```
+WorkflowSettings
+├── allow_parallel_steps: boolean   # Allow concurrent step execution
+├── max_retries: int                # Default retry count for failed steps
+├── default_timeout: duration       # Default step timeout
+├── require_completion: boolean     # All steps must complete to finish
+└── on_error: enum(pause, skip, escalate)  # Default error handling
+```
+
+#### 4.7.2 Input/Output Mapping
+
+```
+InputMapping
+├── source: enum(task_input, previous_step, workflow_context, static)
+├── path: string                    # JSONPath to source data
+├── transform: TransformExpression  # Optional transformation
+└── default: any                    # Default value if source missing
+```
+
+```
+OutputMapping
+├── target: enum(annotation, workflow_context, task_metadata)
+├── path: string                    # JSONPath to target location
+├── merge_strategy: enum(replace, merge, append)
+└── validation: ValidationRule      # Optional output validation
+```
+
+#### 4.7.3 Retry Policy
+
+```
+RetryPolicy
+├── max_attempts: int               # Maximum retry attempts
+├── backoff: enum(fixed, exponential, linear)
+├── initial_delay: duration         # Delay before first retry
+├── max_delay: duration             # Maximum delay between retries
+├── retry_on: string[]              # Error types to retry on
+└── on_exhausted: enum(fail, escalate, skip)
+```
+
 ---
 
-## 5. Layout System
 
-### 5.1 Layout Model
+## 5. Layout & Component System
+
+> **Section Summary:** This section defines the UI framework for annotation interfaces through a three-tier component architecture: Tier 1 (TypeScript/React base components like NERTagger, Classification, BoundingBox built by the core team), Tier 2 (Nunjucks/MDX layouts that compose Tier 1 components - accessible to all developers), and Tier 3 (Python/Rust ML services for AI suggestions). It covers the Layout model with three format options (nunjucks, mdx, tsx), the complete Nunjucks template reference with data binding, control flow, and filters, the template processing pipeline that converts templates to React components at runtime, layout validation with JSON Schema, and layout inheritance/versioning for reuse and migration.
+
+### 5.1 Three-Tier Component Architecture
+
+The platform supports contributors across the technology spectrum (TypeScript, Python, Rust) through a tiered component system:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Component Contribution Model                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  TIER    WHO                  WHAT                    HOW                   │
+│  ──────────────────────────────────────────────────────────────────────────│
+│                                                                             │
+│   1      Core frontend   ──►  Base Components    ──►  TypeScript/React     │
+│          team                 (NERTagger, etc.)      (full control)        │
+│                                                                             │
+│   2      All developers  ──►  Layouts            ──►  Nunjucks (HTML+Jinja) │
+│          (Py/Rust/JS)         (compose tier 1)       (any lang generates)  │
+│                                                                             │
+│   3      Data science    ──►  ML Services        ──►  Python/Rust          │
+│          team                 (AI suggestions)       (server-side)         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.1.1 Tier 1: Base Components (TypeScript/React)
+
+Core annotation primitives written by the frontend team. These are the building blocks that Tier 2 layouts compose.
+
+**Ownership:** Core frontend team only
+**Language:** TypeScript + React
+**Review:** Full code review, security audit
+**Examples:** NERTagger, Classification, BoundingBox, TextArea, AudioPlayer
+
+```tsx
+// packages/components/src/annotation/NERTagger.tsx
+import { forwardRef, useState, useCallback } from 'react';
+
+export interface Entity {
+  id: string;
+  start: number;
+  end: number;
+  type: string;
+  text: string;
+}
+
+export interface EntityTypeConfig {
+  name: string;
+  color: string;
+  hotkey?: string;
+  description?: string;
+}
+
+export interface NERTaggerProps {
+  /** Source text to annotate */
+  source: string;
+  /** Current entity annotations */
+  value: Entity[];
+  /** Called when entities change */
+  onChange: (entities: Entity[]) => void;
+  /** Allow overlapping entity spans */
+  allowOverlapping?: boolean;
+  /** Read-only mode */
+  readOnly?: boolean;
+  /** Entity type definitions */
+  children?: React.ReactNode;  // EntityType components
+  /** Selection event */
+  onEntitySelect?: (entity: Entity) => void;
+  /** Keyboard shortcuts enabled */
+  enableHotkeys?: boolean;
+}
+
+export const NERTagger = forwardRef<HTMLDivElement, NERTaggerProps>(
+  ({ source, value, onChange, allowOverlapping = false, readOnly = false, children, ...props }, ref) => {
+    const entityTypes = useEntityTypesFromChildren(children);
+    const [selection, setSelection] = useState<TextSelection | null>(null);
+    
+    const handleTextSelect = useCallback((sel: TextSelection) => {
+      if (readOnly) return;
+      setSelection(sel);
+    }, [readOnly]);
+    
+    const handleEntityCreate = useCallback((type: string) => {
+      if (!selection) return;
+      
+      const newEntity: Entity = {
+        id: generateId(),
+        start: selection.start,
+        end: selection.end,
+        type,
+        text: source.slice(selection.start, selection.end),
+      };
+      
+      if (!allowOverlapping && hasOverlap(value, newEntity)) {
+        return; // Reject overlapping
+      }
+      
+      onChange([...value, newEntity]);
+      setSelection(null);
+    }, [selection, source, value, onChange, allowOverlapping]);
+    
+    return (
+      <div ref={ref} className="ner-tagger">
+        <TokenizedText 
+          text={source}
+          entities={value}
+          entityTypes={entityTypes}
+          onSelect={handleTextSelect}
+          onEntityClick={props.onEntitySelect}
+        />
+        
+        {selection && !readOnly && (
+          <EntityTypeSelector
+            types={entityTypes}
+            onSelect={handleEntityCreate}
+            onCancel={() => setSelection(null)}
+          />
+        )}
+        
+        <HotkeyHandler
+          enabled={props.enableHotkeys}
+          types={entityTypes}
+          onTypeSelect={handleEntityCreate}
+        />
+      </div>
+    );
+  }
+);
+
+// Child component for declarative entity type configuration
+export const EntityType: React.FC<EntityTypeConfig> = () => null;
+```
+
+**Component Library Structure:**
+
+```
+packages/
+└── @annotation/components/
+    ├── annotation/           # Core annotation components
+    │   ├── NERTagger.tsx
+    │   ├── Classification.tsx
+    │   ├── BoundingBox.tsx
+    │   ├── Relation.tsx
+    │   ├── AudioSegment.tsx
+    │   └── index.ts
+    ├── layout/               # Layout primitives
+    │   ├── Section.tsx
+    │   ├── Grid.tsx
+    │   ├── Box.tsx
+    │   ├── Header.tsx
+    │   └── index.ts
+    ├── form/                 # Form inputs
+    │   ├── Select.tsx
+    │   ├── TextArea.tsx
+    │   ├── Checkbox.tsx
+    │   ├── RadioGroup.tsx
+    │   └── index.ts
+    ├── display/              # Display components
+    │   ├── TextDisplay.tsx
+    │   ├── ImageViewer.tsx
+    │   ├── PDFViewer.tsx
+    │   ├── AudioPlayer.tsx
+    │   └── index.ts
+    ├── control/              # Control flow (Show, ForEach wrappers)
+    │   ├── Show.tsx
+    │   ├── ForEach.tsx
+    │   ├── Switch.tsx
+    │   └── index.ts
+    └── index.ts              # Public API
+```
+
+**Component Development Workflow:**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Tier 1 Component Development                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  1. Design      ──►  2. Implement    ──►  3. Document   ──►  4. Review     │
+│     - Props API       - TypeScript        - Storybook        - Code review │
+│     - Behavior        - Tests             - Props docs       - Security    │
+│     - A11y            - Styling           - Examples         - A11y audit  │
+│                                                                             │
+│                            ▼                                                │
+│                                                                             │
+│  5. Publish     ──►  6. Register    ──►  7. Available in Nunjucks           │
+│     - npm pkg         - Component         - Layouts can use                │
+│     - Changelog       - Registry          - Validated                      │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 5.1.2 Tier 2: Layouts (Nunjucks/MDX Templates)
+
+Layouts compose Tier 1 components using template languages. **Any developer** can create layouts using familiar syntax.
+
+**Supported Formats:**
+
+| Format | Extension | Best For |
+|--------|-----------|----------|
+| **Nunjucks** | `.njk` | Most layouts - familiar Jinja/HTML syntax |
+| **MDX** | `.mdx` | Content-heavy layouts with Markdown |
+
+**Ownership:** All developers (project teams)
+**Primary Language:** Nunjucks (.njk) — identical syntax to Python's Jinja2
+**Alternative:** MDX (.mdx) — Markdown with embedded components
+**Review:** Automated validation + optional review
+**Examples:** Clinical NER layout, Document Classification layout, Adjudication layout
+
+**Why Nunjucks (Recommended):**
+
+| Aspect | Custom DSL | Nunjucks |
+|--------|------------|----------|
+| Familiarity | New syntax to learn | Jinja (AI researchers know it) |
+| Loops | Custom `<ForEach>` | `{% for %}` (standard) |
+| Conditionals | Custom `<Show>` | `{% if %}` (standard) |
+| Tooling | Build from scratch | Syntax highlighting, linters exist |
+| Generate from Python | Need SDK | Just string templates |
+| Generate from Rust | Need SDK | Just string templates |
+
+**Template Syntax:**
+
+```html
+{# layouts/clinical-ner-v1.njk #}
+
+<Layout id="clinical-ner-v1">
+  <Section direction="column" gap="md">
+    <Header level="3">{{ config.title | default("Source Document") }}</Header>
+    <TextDisplay source="{{ input.document_text }}" />
+  </Section>
+
+  {# Show AI suggestions if available #}
+  {% if context.ai_suggestions | length > 0 %}
+    <Alert variant="info">
+      AI found {{ context.ai_suggestions | length }} potential entities
+    </Alert>
+    <AISuggestions 
+      suggestions="{{ context.ai_suggestions }}"
+      onAccept="acceptSuggestion"
+      onReject="rejectSuggestion"
+    />
+  {% endif %}
+
+  <NERTagger 
+    source="{{ input.document_text }}" 
+    value="{{ output.entities }}"
+    allowOverlapping="false"
+  >
+    {% for et in config.entity_types %}
+      <EntityType 
+        name="{{ et.name }}" 
+        color="{{ et.color }}" 
+        hotkey="{{ et.hotkey }}" 
+      />
+    {% endfor %}
+  </NERTagger>
+
+  <Section direction="row" gap="md">
+    <Select value="{{ output.confidence }}" label="Confidence" required>
+      {% for level in ['high', 'medium', 'low'] %}
+        <Option value="{{ level }}">{{ level | capitalize }}</Option>
+      {% endfor %}
+    </Select>
+    
+    <TextArea 
+      value="{{ output.notes }}" 
+      label="Notes"
+      placeholder="Any observations..."
+    />
+  </Section>
+</Layout>
+```
+
+**Data Context Available in Templates:**
+
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `input` | Task input data (read-only) | `{{ input.document_text }}` |
+| `output` | Annotation output (bound) | `{{ output.entities }}` |
+| `context` | Task context (AI, previous annotations) | `{{ context.ai_suggestions }}` |
+| `config` | Layout configuration | `{{ config.entity_types }}` |
+| `user` | Current user info | `{{ user.name }}` |
+
+**Jinja Features Supported:**
+
+```html
+{# Variables #}
+{{ input.text }}
+{{ config.title | default("Untitled") }}
+
+{# Filters #}
+{{ name | capitalize }}
+{{ items | length }}
+{{ data | json }}
+{{ text | truncate(100) }}
+
+{# Conditionals #}
+{% if context.ai_suggestions | length > 0 %}
+  ...
+{% elif context.previous_annotations %}
+  ...
+{% else %}
+  ...
+{% endif %}
+
+{# Loops #}
+{% for item in input.items %}
+  <Card>{{ item.text }}</Card>
+{% endfor %}
+
+{% for entity in output.entities %}
+  <EntityBadge 
+    index="{{ loop.index }}"
+    first="{{ loop.first }}"
+    last="{{ loop.last }}"
+  >
+    {{ entity.text }}
+  </EntityBadge>
+{% endfor %}
+
+{# Includes (reusable partials) #}
+{% include "partials/entity-legend.njk" %}
+
+{# Macros (reusable components) #}
+{% macro renderQuestion(q, index) %}
+  <QuestionCard>
+    <Text>{{ index + 1 }}. {{ q.text }}</Text>
+    <TextArea value="{{ output.answers[q.id] }}" />
+  </QuestionCard>
+{% endmacro %}
+
+{% for q in input.questions %}
+  {{ renderQuestion(q, loop.index0) }}
+{% endfor %}
+
+{# Comments #}
+{# This is a comment - won't appear in output #}
+```
+
+**Python: Generating Templates**
+
+AI researchers can generate templates programmatically:
+
+```python
+# python-sdk/annotation_layouts/generators.py
+from dataclasses import dataclass, field
+from typing import List, Optional
+import json
+
+@dataclass
+class EntityType:
+    name: str
+    color: str
+    hotkey: Optional[str] = None
+
+@dataclass  
+class NERLayoutGenerator:
+    """Generate NER annotation layouts."""
+    
+    id: str
+    name: str
+    entity_types: List[EntityType]
+    show_ai_suggestions: bool = True
+    show_confidence: bool = True
+    show_notes: bool = True
+    
+    def generate_template(self) -> str:
+        """Generate Nunjucks template."""
+        
+        template = f'''<Layout id="{self.id}">
+  <Section direction="column" gap="md">
+    <Header level="3">{{{{ config.title | default("Source Document") }}}}</Header>
+    <TextDisplay source="{{{{ input.document_text }}}}" />
+  </Section>
+'''
+        
+        if self.show_ai_suggestions:
+            template += '''
+  {% if context.ai_suggestions | length > 0 %}
+    <AISuggestions 
+      suggestions="{{ context.ai_suggestions }}"
+      onAccept="acceptSuggestion"
+    />
+  {% endif %}
+'''
+        
+        template += '''
+  <NERTagger 
+    source="{{ input.document_text }}" 
+    value="{{ output.entities }}"
+  >
+    {% for et in config.entity_types %}
+      <EntityType name="{{ et.name }}" color="{{ et.color }}" hotkey="{{ et.hotkey }}" />
+    {% endfor %}
+  </NERTagger>
+'''
+        
+        if self.show_confidence or self.show_notes:
+            template += '\n  <Section direction="row" gap="md">'
+            
+            if self.show_confidence:
+                template += '''
+    <Select value="{{ output.confidence }}" label="Confidence" required>
+      {% for level in config.confidence_levels %}
+        <Option value="{{ level }}">{{ level | capitalize }}</Option>
+      {% endfor %}
+    </Select>'''
+            
+            if self.show_notes:
+                template += '''
+    <TextArea value="{{ output.notes }}" label="Notes" />'''
+            
+            template += '\n  </Section>'
+        
+        template += '\n</Layout>'
+        return template
+    
+    def generate_config(self) -> dict:
+        """Generate config object for template."""
+        return {
+            "title": self.name,
+            "entity_types": [
+                {"name": et.name, "color": et.color, "hotkey": et.hotkey}
+                for et in self.entity_types
+            ],
+            "confidence_levels": ["high", "medium", "low"],
+        }
+    
+    def save(self, directory: str):
+        """Save template and config files."""
+        import os
+        os.makedirs(directory, exist_ok=True)
+        
+        # Save template
+        with open(f"{directory}/{self.id}.njk", "w") as f:
+            f.write(self.generate_template())
+        
+        # Save config
+        with open(f"{directory}/{self.id}.config.json", "w") as f:
+            json.dump(self.generate_config(), f, indent=2)
+        
+        print(f"Generated: {directory}/{self.id}.njk")
+
+
+# Usage by AI researcher:
+layout = NERLayoutGenerator(
+    id="clinical-ner-v1",
+    name="Clinical NER Annotation",
+    entity_types=[
+        EntityType("Diagnosis", "#FF6B6B", "d"),
+        EntityType("Medication", "#4ECDC4", "m"),
+        EntityType("Procedure", "#45B7D1", "p"),
+        EntityType("Anatomy", "#96CEB4", "a"),
+    ],
+    show_ai_suggestions=True,
+)
+
+layout.save("layouts/")
+```
+
+**Rust: Generating Templates**
+
+```rust
+// rust-sdk/src/layouts/ner.rs
+use serde::{Deserialize, Serialize};
+use std::fs;
+
+#[derive(Serialize)]
+pub struct EntityType {
+    pub name: String,
+    pub color: String,
+    pub hotkey: Option<char>,
+}
+
+#[derive(Serialize)]
+pub struct LayoutConfig {
+    pub title: String,
+    pub entity_types: Vec<EntityType>,
+    pub confidence_levels: Vec<String>,
+}
+
+pub struct NERLayoutGenerator {
+    pub id: String,
+    pub name: String,
+    pub entity_types: Vec<EntityType>,
+}
+
+impl NERLayoutGenerator {
+    pub fn generate_template(&self) -> String {
+        format!(r#"<Layout id="{}">
+  <Section direction="column" gap="md">
+    <Header level="3">{{{{ config.title }}}}</Header>
+    <TextDisplay source="{{{{ input.document_text }}}}" />
+  </Section>
+
+  {{% if context.ai_suggestions | length > 0 %}}
+    <AISuggestions suggestions="{{{{ context.ai_suggestions }}}}" />
+  {{% endif %}}
+
+  <NERTagger source="{{{{ input.document_text }}}}" value="{{{{ output.entities }}}}">
+    {{% for et in config.entity_types %}}
+      <EntityType name="{{{{ et.name }}}}" color="{{{{ et.color }}}}" hotkey="{{{{ et.hotkey }}}}" />
+    {{% endfor %}}
+  </NERTagger>
+
+  <Section direction="row" gap="md">
+    <Select value="{{{{ output.confidence }}}}" label="Confidence" required>
+      {{% for level in config.confidence_levels %}}
+        <Option value="{{{{ level }}}}">{{{{ level | capitalize }}}}</Option>
+      {{% endfor %}}
+    </Select>
+    <TextArea value="{{{{ output.notes }}}}" label="Notes" />
+  </Section>
+</Layout>"#, self.id)
+    }
+    
+    pub fn generate_config(&self) -> LayoutConfig {
+        LayoutConfig {
+            title: self.name.clone(),
+            entity_types: self.entity_types.clone(),
+            confidence_levels: vec!["high".into(), "medium".into(), "low".into()],
+        }
+    }
+    
+    pub fn save(&self, directory: &str) -> std::io::Result<()> {
+        fs::create_dir_all(directory)?;
+        
+        fs::write(
+            format!("{}/{}.njk", directory, self.id),
+            self.generate_template(),
+        )?;
+        
+        fs::write(
+            format!("{}/{}.config.json", directory, self.id),
+            serde_json::to_string_pretty(&self.generate_config())?,
+        )?;
+        
+        Ok(())
+    }
+}
+```
+
+**Or Just Write Templates Directly:**
+
+For simple layouts, just write the template file directly:
+
+```html
+{# layouts/simple-classification.njk #}
+
+<Layout id="simple-classification">
+  <Section direction="column" gap="lg">
+    
+    <TextDisplay source="{{ input.text }}" />
+    
+    <Classification 
+      value="{{ output.label }}"
+      options="{{ config.labels | json }}"
+      required
+    />
+    
+    {% if config.show_reasoning %}
+      <TextArea 
+        value="{{ output.reasoning }}" 
+        label="Explain your choice"
+        rows="3"
+      />
+    {% endif %}
+    
+  </Section>
+</Layout>
+```
+
+#### 5.1.3 Tier 3: ML Services (Server-Side Python/Rust)
+
+Backend services that provide AI-powered features. These run server-side and communicate via API.
+
+**Ownership:** Data science team
+**Language:** Python (primary), Rust (performance-critical)
+**Review:** Code review + API security review
+**Examples:** AI entity suggestions, quality prediction, active learning selection
+
+```python
+# services/ml-suggestions/src/handlers/ner_suggestions.py
+from fastapi import APIRouter
+from pydantic import BaseModel
+from transformers import pipeline
+
+router = APIRouter()
+
+class NERRequest(BaseModel):
+    text: str
+    entity_types: list[str]
+    confidence_threshold: float = 0.8
+
+class Entity(BaseModel):
+    start: int
+    end: int
+    type: str
+    text: str
+    confidence: float
+
+class NERResponse(BaseModel):
+    entities: list[Entity]
+    model_version: str
+
+# Load model once at startup
+ner_pipeline = None
+
+@router.on_event("startup")
+async def load_model():
+    global ner_pipeline
+    ner_pipeline = pipeline(
+        "ner",
+        model="clinical-ner-bert-v2",
+        aggregation_strategy="simple",
+    )
+
+@router.post("/api/ml/ner-suggestions", response_model=NERResponse)
+async def get_ner_suggestions(request: NERRequest) -> NERResponse:
+    """Generate AI entity suggestions for NER annotation."""
+    
+    results = ner_pipeline(request.text)
+    
+    entities = [
+        Entity(
+            start=r["start"],
+            end=r["end"],
+            type=r["entity_group"],
+            text=r["word"],
+            confidence=r["score"],
+        )
+        for r in results
+        if r["score"] >= request.confidence_threshold
+        and r["entity_group"] in request.entity_types
+    ]
+    
+    return NERResponse(
+        entities=entities,
+        model_version="clinical-ner-bert-v2",
+    )
+```
+
+**Integration with Tier 2 layouts:**
+
+```html
+{# Layout references ML service via context #}
+<Layout id="clinical-ner-with-ai">
+  {# ML suggestions loaded into context by platform #}
+  {% if context.ai_suggestions | length > 0 %}
+    <Alert variant="info">
+      AI found {{ context.ai_suggestions | length }} potential entities
+    </Alert>
+    
+    <AISuggestionList
+      suggestions="{{ context.ai_suggestions }}"
+      onAccept="acceptSuggestion"
+      onReject="rejectSuggestion"
+    />
+  {% endif %}
+  
+  <NERTagger 
+    source="{{ input.document_text }}" 
+    value="{{ output.entities }}"
+  >
+    {# Entity types from config #}
+    {% for et in config.entity_types %}
+      <EntityType name="{{ et.name }}" color="{{ et.color }}" />
+    {% endfor %}
+  </NERTagger>
+</Layout>
+```
+
+**Platform loads ML context before rendering:**
+
+```typescript
+// Platform loads ML suggestions before rendering layout
+async function loadTaskContext(task: Task, layout: Layout): Promise<TaskContext> {
+  const context: TaskContext = {
+    task_id: task.id,
+    previous_annotations: await loadPreviousAnnotations(task),
+    ai_suggestions: [],
+  };
+  
+  // Check if layout uses AI suggestions
+  if (layoutUsesAISuggestions(layout)) {
+    const mlService = getMLService('ner-suggestions');
+    context.ai_suggestions = await mlService.getSuggestions({
+      text: task.input.document_text,
+      entity_types: layout.entityTypes,
+    });
+  }
+  
+  return context;
+}
+```
+
+#### 5.1.4 Security Model
+
+| Tier | Trust Level | Isolation | Validation | Review |
+|------|-------------|-----------|------------|--------|
+| **Tier 1: TSX Components** | Fully trusted | Browser sandbox | TypeScript compiler | Full code review |
+| **Tier 2: Nunjucks Layouts** | Constrained | Interpreter limits scope | Schema + allowlist | Automated + optional |
+| **Tier 3: ML Services** | Trusted (internal) | Network isolation | API schema | Code review |
+
+**Tier 2 (Nunjucks) Security Constraints:**
+
+```typescript
+// Nunjucks security rules enforced by runtime
+const NUNJUCKS_SECURITY_RULES = {
+  // Only allow registered components
+  allowedComponents: Object.keys(Components),
+  
+  // Binding paths must start with $ and can't escape
+  bindingPathPattern: /^\$\.(input|output|context|ui)\./,
+  
+  // No arbitrary JavaScript execution
+  expressionAllowlist: [
+    'length', 'includes', 'startsWith', 'endsWith',  // String methods
+    '>', '<', '>=', '<=', '==', '!=', '&&', '||', '!',  // Operators
+    '+', '-', '*', '/',  // Arithmetic
+  ],
+  
+  // No external URLs in props
+  disallowedPropPatterns: [
+    /^(http|https|javascript|data):/i,
+    /<script/i,
+  ],
+  
+  // Max nesting depth
+  maxDepth: 20,
+  
+  // Max iterations in ForEach
+  maxIterations: 1000,
+};
+```
+
+#### 5.1.5 Developer Experience by Role
+
+| Role | Creates | Tools | Workflow |
+|------|---------|-------|----------|
+| **Frontend Engineer** | Tier 1 components | VS Code, TypeScript, Storybook, Jest | PR → Review → Merge → Publish |
+| **Full-Stack Developer** | Tier 2 layouts | VS Code, Python/Rust SDK, Layout Preview | Write/Generate → Validate → Deploy |
+| **Data Scientist** | Tier 2 layouts + Tier 3 services | Python SDK, Jupyter, FastAPI | Generate → Build model → Deploy |
+| **Project Manager** | Tier 2 layouts (simple) | Layout Builder UI (future) | Visual editor → Preview → Publish |
+
+---
+
+### 5.2 Layout Model
 
 ```
 Layout
@@ -700,454 +2072,872 @@ Layout
 ├── name: string
 ├── version: int
 ├── project_type_id: UUID
-├── step_id: UUID  # Which workflow step this layout is for
-├── source: enum(custom, copy, inherit)
-├── source_layout_id: UUID  # If copied/inherited
-├── components: LayoutComponent[]
-├── data_bindings: DataBinding[]
+├── step_id: UUID                  # Which workflow step this layout is for
+├── format: enum(nunjucks, mdx, tsx)  # Template format
+├── template_source: string        # Raw template content (.njk, .mdx, .tsx)
+├── config: LayoutConfig           # Config object passed to template
+├── schema: LayoutSchema           # Input/output Zod schemas
 ├── validation_rules: ValidationRule[]
 └── settings: LayoutSettings
 ```
 
-### 5.2 Layout Configuration
+**Layout Files:**
 
-Layouts are defined using an **HTML/JSX-like markup language** that maps directly to React components. This provides:
-- Familiar syntax for frontend developers
-- Clear visual hierarchy
-- Strong tooling support (syntax highlighting, validation, autocomplete)
-- Direct mapping to rendered components
+```
+layouts/
+├── clinical-ner-v1/
+│   ├── template.njk           # Nunjucks template
+│   ├── config.json            # Configuration for template
+│   ├── schema.json            # Input/output schema
+│   └── README.md              # Documentation
+├── document-classification/
+│   ├── template.njk
+│   ├── config.json
+│   └── schema.json
+└── complex-annotation/
+    └── template.tsx           # TSX for complex layouts
+```
 
-#### 5.2.1 Layout Definition Language (LDL)
+**Layout Settings:**
 
-```xml
-<!-- Layout definition for Clinical NER annotation -->
-<Layout id="clinical-ner-v1" name="Clinical NER Layout" version="1">
+```
+LayoutSettings
+├── auto_save: boolean             # Enable auto-save drafts
+├── auto_save_interval: duration   # Interval for auto-save (default: 30s)
+├── show_progress: boolean         # Show completion progress indicator
+├── keyboard_shortcuts: boolean    # Enable keyboard navigation
+├── confirm_submit: boolean        # Require confirmation before submit
+├── allow_skip: boolean            # Allow skipping task without annotation
+└── custom_css: string             # Optional custom CSS overrides
+```
+
+---
+
+### 5.3 Nunjucks Template Reference
+
+#### 5.3.1 Data Binding
+
+Templates receive a data context with these variables:
+
+```html
+{# Read from task input (read-only) #}
+<TextDisplay source="{{ input.document_text }}" />
+<ImageViewer src="{{ input.image_url }}" />
+
+{# Bind to output (two-way binding handled by runtime) #}
+<TextArea value="{{ output.notes }}" />
+<Select value="{{ output.confidence }}" />
+
+{# Access task context #}
+<Show if="{{ context.previous_annotations | length > 0 }}">
+  <PreviousAnnotations data="{{ context.previous_annotations }}" />
+</Show>
+
+{# Access layout config #}
+{% for et in config.entity_types %}
+  <EntityType name="{{ et.name }}" color="{{ et.color }}" />
+{% endfor %}
+
+{# Access user info #}
+<Text>Annotator: {{ user.name }}</Text>
+```
+
+**Context Variables:**
+
+| Variable | Description | Writable |
+|----------|-------------|----------|
+| `input` | Task input data | No |
+| `output` | Annotation output | Yes (via component binding) |
+| `context` | Task context (AI suggestions, previous annotations) | No |
+| `config` | Layout configuration from config.json | No |
+| `user` | Current user info | No |
+| `task` | Task metadata (id, priority, etc.) | No |
+
+#### 5.3.2 Control Flow
+
+**Conditionals:**
+
+```html
+{# Simple if #}
+{% if context.ai_suggestions | length > 0 %}
+  <AISuggestions suggestions="{{ context.ai_suggestions }}" />
+{% endif %}
+
+{# If-else #}
+{% if input.type == "image" %}
+  <ImageViewer src="{{ input.url }}" />
+{% elif input.type == "pdf" %}
+  <PDFViewer src="{{ input.url }}" />
+{% else %}
+  <TextDisplay source="{{ input.text }}" />
+{% endif %}
+
+{# Ternary in attributes #}
+<Button variant="{{ 'primary' if output.entities | length > 0 else 'disabled' }}">
+  Submit
+</Button>
+```
+
+**Loops:**
+
+```html
+{# Basic loop #}
+{% for item in input.items %}
+  <Card>
+    <Text>{{ item.text }}</Text>
+  </Card>
+{% endfor %}
+
+{# Loop with index #}
+{% for question in input.questions %}
+  <QuestionCard>
+    <Text>{{ loop.index }}. {{ question.text }}</Text>
+    <TextArea value="{{ output.answers[loop.index0] }}" />
+  </QuestionCard>
+{% endfor %}
+
+{# Loop variables available #}
+{# loop.index     - 1-based index #}
+{# loop.index0    - 0-based index #}
+{# loop.first     - true if first iteration #}
+{# loop.last      - true if last iteration #}
+{# loop.length    - total number of items #}
+
+{# Loop with else (empty state) #}
+{% for entity in output.entities %}
+  <EntityBadge>{{ entity.text }}</EntityBadge>
+{% else %}
+  <Text color="muted">No entities tagged yet</Text>
+{% endfor %}
+```
+
+**Includes (Reusable Partials):**
+
+```html
+{# layouts/partials/entity-legend.njk #}
+<Section direction="row" gap="sm">
+  {% for et in config.entity_types %}
+    <Badge color="{{ et.color }}">{{ et.hotkey }}: {{ et.name }}</Badge>
+  {% endfor %}
+</Section>
+
+{# Main layout #}
+<Layout id="ner-layout">
+  {% include "partials/entity-legend.njk" %}
   
-  <!-- Document display section -->
-  <Section direction="column" gap="md">
-    <Header level="3">Source Document</Header>
-    
-    <TextDisplay 
-      bind:source="$.input.document_text"
-      format="plain"
-      :highlight="$.ui_context.ai_highlights"
-    />
-  </Section>
-
-  <!-- Main annotation area -->
-  <Section direction="column" gap="lg" flex="1">
-    <Header level="3">Entity Annotation</Header>
-    
-    <NERTagger
-      bind:source="$.input.document_text"
-      bind:value="$.output.entities"
-      :allow-overlapping="false"
-    >
-      <EntityType name="Diagnosis" color="#FF6B6B" hotkey="d" />
-      <EntityType name="Medication" color="#4ECDC4" hotkey="m" />
-      <EntityType name="Procedure" color="#45B7D1" hotkey="p" />
-      <EntityType name="Anatomy" color="#96CEB4" hotkey="a" />
-    </NERTagger>
-    
-    <!-- Show AI suggestions if available -->
-    <Show when="$.ui_context.ai_predictions">
-      <AISuggestions 
-        bind:predictions="$.ui_context.ai_predictions"
-        on:accept="applyPrediction"
-      />
-    </Show>
-  </Section>
-
-  <!-- Metadata section -->
-  <Section direction="row" gap="md">
-    <Select
-      bind:value="$.output.confidence"
-      label="Confidence Level"
-      required="true"
-      flex="1"
-    >
-      <Option value="high">High - Very confident</Option>
-      <Option value="medium">Medium - Some uncertainty</Option>
-      <Option value="low">Low - Significant uncertainty</Option>
-    </Select>
-    
-    <TextArea
-      bind:value="$.output.notes"
-      label="Notes"
-      placeholder="Any additional observations..."
-      :rows="3"
-      flex="2"
-    />
-  </Section>
-
+  <NERTagger source="{{ input.text }}" value="{{ output.entities }}">
+    ...
+  </NERTagger>
 </Layout>
 ```
 
-#### 5.2.2 Layout DSL Syntax
+**Macros (Reusable Components):**
 
-**Data Binding:**
-```xml
-<!-- One-way binding from data source -->
-<TextDisplay bind:source="$.input.document_text" />
+```html
+{# Define a macro #}
+{% macro questionField(question, index) %}
+  <Section direction="column" gap="sm">
+    <Label>{{ index + 1 }}. {{ question.text }}</Label>
+    {% if question.type == "text" %}
+      <TextArea value="{{ output.answers[question.id] }}" />
+    {% elif question.type == "choice" %}
+      <RadioGroup value="{{ output.answers[question.id] }}">
+        {% for opt in question.options %}
+          <Radio value="{{ opt.value }}">{{ opt.label }}</Radio>
+        {% endfor %}
+      </RadioGroup>
+    {% endif %}
+  </Section>
+{% endmacro %}
 
-<!-- Two-way binding for form inputs -->
-<TextInput bind:value="$.output.patient_name" />
-
-<!-- Reactive expressions (prefixed with :) -->
-<Panel :visible="$.output.entities.length > 0" />
-<Button :disabled="!$.validation.isValid" />
+{# Use the macro #}
+{% for q in input.questions %}
+  {{ questionField(q, loop.index0) }}
+{% endfor %}
 ```
 
-**Control Flow:**
-```xml
-<!-- Conditional rendering -->
-<Show when="$.context.has_previous_annotations">
-  <PreviousAnnotations bind:data="$.context.previous" />
-</Show>
+#### 5.3.3 Filters
 
-<Show when="$.input.document_type" equals="pdf">
-  <PDFViewer bind:source="$.input.document_url" />
-</Show>
+Nunjucks provides many built-in filters:
 
-<!-- Fallback content -->
-<Show when="$.input.image_url" fallback={<Text>No image available</Text>}>
-  <ImageViewer bind:source="$.input.image_url" />
-</Show>
+```html
+{# String filters #}
+{{ name | capitalize }}              {# "john" → "John" #}
+{{ name | upper }}                   {# "john" → "JOHN" #}
+{{ name | lower }}                   {# "JOHN" → "john" #}
+{{ text | truncate(100) }}           {# Truncate to 100 chars #}
+{{ text | trim }}                    {# Remove whitespace #}
+{{ text | replace("a", "b") }}       {# Replace substring #}
 
-<!-- Iteration -->
-<ForEach items="$.input.sentences" as="sentence" key="index">
-  <SentenceAnnotator 
-    bind:text="sentence.text"
-    bind:value="$.output.annotations[index]"
-  />
-</ForEach>
+{# Array filters #}
+{{ items | length }}                 {# Array length #}
+{{ items | first }}                  {# First element #}
+{{ items | last }}                   {# Last element #}
+{{ items | join(", ") }}             {# Join array #}
+{{ items | sort }}                   {# Sort array #}
+{{ items | reverse }}                {# Reverse array #}
 
-<!-- Switch/case -->
-<Switch on="$.input.task_type">
-  <Case value="ner">
-    <NERTagger ... />
-  </Case>
-  <Case value="classification">
-    <Classification ... />
-  </Case>
-  <Default>
-    <Text>Unsupported task type</Text>
-  </Default>
-</Switch>
+{# Default values #}
+{{ title | default("Untitled") }}    {# Default if undefined #}
+
+{# JSON (custom filter) #}
+{{ config.entity_types | json }}     {# Serialize to JSON string #}
+
+{# Safe HTML (custom filter) #}
+{{ input.html_content | safe }}      {# Render as HTML #}
 ```
 
-**Layout & Styling:**
-```xml
-<!-- Flexbox layouts -->
-<Section direction="row" gap="md" align="center" justify="between">
-  <Box flex="1">...</Box>
-  <Box flex="2">...</Box>
-</Section>
+**Custom Filters (defined by platform):**
 
-<!-- Grid layouts -->
-<Grid columns="3" gap="lg">
-  <GridItem span="2">Wide content</GridItem>
-  <GridItem>Narrow content</GridItem>
-</Grid>
-
-<!-- Responsive breakpoints -->
-<Section 
-  direction="column" 
-  direction:md="row"
-  gap="sm"
-  gap:lg="md"
->
-  ...
-</Section>
+```typescript
+// packages/layout-runtime/src/filters.ts
+env.addFilter('json', (obj) => JSON.stringify(obj));
+env.addFilter('safe', (str) => new nunjucks.runtime.SafeString(str));
+env.addFilter('formatDate', (date, format) => dayjs(date).format(format));
+env.addFilter('pluralize', (count, singular, plural) => 
+  count === 1 ? singular : (plural || singular + 's')
+);
 ```
 
-**Events:**
-```xml
-<!-- Event handlers (implemented in layout hooks) -->
-<Button on:click="submitAnnotation">Submit</Button>
-<TextInput on:change="validateField" on:blur="saveProgress" />
+#### 5.3.4 Layout Components
 
-<!-- Built-in events -->
-<NERTagger 
-  on:entity-add="onEntityAdded"
-  on:entity-remove="onEntityRemoved"
-  on:selection-change="onSelectionChange"
+All Tier 1 components are available as HTML-like tags:
+
+```html
+{# Layout primitives #}
+<Section direction="row|column" gap="sm|md|lg" align="start|center|end">
+<Grid columns="2|3|4" gap="md">
+<Box flex="1" padding="md">
+
+{# Typography #}
+<Header level="1|2|3|4">Title</Header>
+<Text size="sm|md|lg" color="default|muted|error">Content</Text>
+<Label required>Field Label</Label>
+
+{# Display components #}
+<TextDisplay source="{{ input.text }}" />
+<ImageViewer src="{{ input.image_url }}" zoom="true" />
+<PDFViewer src="{{ input.pdf_url }}" page="{{ context.current_page }}" />
+<AudioPlayer src="{{ input.audio_url }}" />
+
+{# Annotation components #}
+<NERTagger source="{{ input.text }}" value="{{ output.entities }}">
+<Classification value="{{ output.label }}" options="{{ config.labels | json }}" />
+<BoundingBox src="{{ input.image_url }}" value="{{ output.boxes }}" />
+<Relation entities="{{ output.entities }}" value="{{ output.relations }}" />
+
+{# Form inputs #}
+<TextArea value="{{ output.notes }}" label="Notes" rows="3" />
+<Select value="{{ output.choice }}" label="Select one" required>
+<Checkbox value="{{ output.confirmed }}" label="I confirm this is correct" />
+<RadioGroup value="{{ output.option }}">
+
+{# Feedback components #}
+<Alert variant="info|warning|error">Message</Alert>
+<AISuggestions suggestions="{{ context.ai_suggestions }}" />
+<PreviousAnnotations data="{{ context.previous }}" />
+```
+
+#### 5.3.5 Event Handlers
+
+```html
+{# Built-in handlers #}
+<Button onClick="submit">Submit</Button>
+<Button onClick="skip">Skip Task</Button>
+<Button onClick="saveDraft">Save Draft</Button>
+
+{# Custom handlers (defined in layout config) #}
+<AISuggestions 
+  suggestions="{{ context.ai_suggestions }}"
+  onAccept="acceptSuggestion"
+  onReject="rejectSuggestion"
+/>
+
+<NERTagger
+  source="{{ input.text }}"
+  value="{{ output.entities }}"
+  onEntityAdd="trackEntityAdded"
 />
 ```
 
-#### 5.2.3 Component Schema
+**Built-in Handlers:**
 
-Each component has a strongly-typed schema:
+| Handler | Description |
+|---------|-------------|
+| `submit` | Submit annotation, advance to next task |
+| `skip` | Skip current task |
+| `saveDraft` | Save progress without submitting |
+| `undo` | Undo last change |
+| `redo` | Redo undone change |
+| `reset` | Reset to initial state |
+
+---
+
+### 5.4 Template Processing Pipeline
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       Template Processing Pipeline                          │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  .njk Template                 .mdx Template              .tsx Component    │
+│       │                             │                          │            │
+│       ▼                             ▼                          ▼            │
+│  ┌──────────┐                 ┌──────────┐               ┌──────────┐      │
+│  │ Nunjucks │                 │   MDX    │               │   TSC    │      │
+│  │ Compile  │                 │ Compile  │               │ Compile  │      │
+│  └────┬─────┘                 └────┬─────┘               └────┬─────┘      │
+│       │                            │                          │            │
+│       ▼                            ▼                          │            │
+│  HTML String                  React Component                 │            │
+│       │                            │                          │            │
+│       ▼                            │                          │            │
+│  ┌──────────┐                      │                          │            │
+│  │  Parse   │                      │                          │            │
+│  │   HTML   │                      │                          │            │
+│  └────┬─────┘                      │                          │            │
+│       │                            │                          │            │
+│       ▼                            ▼                          ▼            │
+│  ┌─────────────────────────────────────────────────────────────────┐       │
+│  │                     React Renderer                               │       │
+│  │              (with registered Tier 1 components)                 │       │
+│  └─────────────────────────────────────────────────────────────────┘       │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Nunjucks → React Runtime:**
 
 ```typescript
-// Component definition with props schema
-interface NERTaggerProps {
-  // Data bindings
-  'bind:source': JSONPath;      // Text to annotate
-  'bind:value': JSONPath;       // Where to store entities
-  
-  // Configuration
-  'allow-overlapping'?: boolean;
-  'min-span-length'?: number;
-  'max-span-length'?: number;
-  'show-labels'?: boolean;
-  
-  // Children (entity type definitions)
-  children: EntityTypeElement[];
+// packages/layout-runtime/src/nunjucks-renderer.tsx
+import nunjucks from 'nunjucks';
+import { parseDocument } from 'htmlparser2';
+import { createElement, Fragment, useMemo, useCallback } from 'react';
+import * as Components from '@annotation/components';
+
+// Configure Nunjucks environment
+const env = new nunjucks.Environment(
+  new nunjucks.FileSystemLoader('layouts/'),
+  { autoescape: true, throwOnUndefined: true }
+);
+
+// Add custom filters
+env.addFilter('json', (obj) => JSON.stringify(obj));
+env.addFilter('safe', (str) => new nunjucks.runtime.SafeString(str));
+
+interface LayoutContext {
+  input: Record<string, any>;
+  output: Record<string, any>;
+  context: Record<string, any>;
+  config: Record<string, any>;
+  user: { id: string; name: string; };
+  task: { id: string; };
 }
 
-interface EntityTypeElement {
-  name: string;
-  color: CSSColor;
-  hotkey?: string;
-  description?: string;
-  validation?: {
-    pattern?: RegExp;
-    minLength?: number;
-    maxLength?: number;
+interface NunjucksLayoutProps {
+  template: string;
+  data: LayoutContext;
+  onChange: (output: any) => void;
+  onEvent: (event: string, payload: any) => void;
+}
+
+export function NunjucksLayout({ template, data, onChange, onEvent }: NunjucksLayoutProps) {
+  // 1. Render Nunjucks template to HTML string
+  const html = useMemo(() => {
+    try {
+      return env.renderString(template, data);
+    } catch (err) {
+      console.error('Template render error:', err);
+      return `<Alert variant="error">Template error: ${err.message}</Alert>`;
+    }
+  }, [template, data]);
+  
+  // 2. Parse HTML to AST
+  const ast = useMemo(() => parseDocument(html), [html]);
+  
+  // 3. Create change handler for output bindings
+  const handleChange = useCallback((path: string, value: any) => {
+    const newOutput = setPath({ ...data.output }, path, value);
+    onChange(newOutput);
+  }, [data.output, onChange]);
+  
+  // 4. Convert AST to React elements
+  return useMemo(() => 
+    astToReact(ast, data, handleChange, onEvent),
+    [ast, data, handleChange, onEvent]
+  );
+}
+
+function astToReact(
+  node: any,
+  data: LayoutContext,
+  onChange: (path: string, value: any) => void,
+  onEvent: (event: string, payload: any) => void
+): React.ReactNode {
+  // Handle text nodes
+  if (node.type === 'text') {
+    const text = node.data.trim();
+    return text || null;
+  }
+  
+  // Handle element nodes
+  if (node.type === 'tag') {
+    const componentName = pascalCase(node.name);
+    const Component = Components[componentName];
+    
+    if (!Component) {
+      console.warn(`Unknown component: ${componentName}`);
+      return null;
+    }
+    
+    // Parse attributes into props
+    const props: Record<string, any> = {};
+    
+    for (const [attrName, attrValue] of Object.entries(node.attribs || {})) {
+      const value = attrValue as string;
+      
+      // Handle output binding: value="{{ output.entities }}"
+      if (attrName === 'value' && value.includes('output.')) {
+        const path = extractOutputPath(value);
+        props.value = getPath(data.output, path);
+        props.onChange = (newValue: any) => onChange(path, newValue);
+      }
+      // Handle input binding: source="{{ input.text }}"
+      else if (value.includes('input.')) {
+        props[attrName] = getPath(data.input, extractPath(value, 'input.'));
+      }
+      // Handle context binding: suggestions="{{ context.ai_suggestions }}"
+      else if (value.includes('context.')) {
+        props[attrName] = getPath(data.context, extractPath(value, 'context.'));
+      }
+      // Handle config binding: options="{{ config.labels | json }}"
+      else if (value.includes('config.')) {
+        props[attrName] = getPath(data.config, extractPath(value, 'config.'));
+      }
+      // Handle event handlers: onClick="submit"
+      else if (attrName.startsWith('on') && !value.includes('{{')) {
+        props[attrName] = () => onEvent(value, {});
+      }
+      // Parse other values (numbers, booleans, strings)
+      else {
+        props[attrName] = parseAttributeValue(value);
+      }
+    }
+    
+    // Recursively render children
+    const children = (node.children || [])
+      .map((child: any, i: number) => 
+        <Fragment key={i}>{astToReact(child, data, onChange, onEvent)}</Fragment>
+      )
+      .filter(Boolean);
+    
+    return createElement(Component, props, children.length > 0 ? children : undefined);
+  }
+  
+  // Handle root/document nodes
+  if (node.type === 'root' || node.type === 'document') {
+    const children = (node.children || [])
+      .map((child: any, i: number) => 
+        <Fragment key={i}>{astToReact(child, data, onChange, onEvent)}</Fragment>
+      )
+      .filter(Boolean);
+    return createElement(Fragment, null, children);
+  }
+  
+  return null;
+}
+
+// Helper functions
+function pascalCase(str: string): string {
+  return str.replace(/(^|-)([a-z])/g, (_, __, c) => c.toUpperCase());
+}
+
+function extractOutputPath(value: string): string {
+  const match = value.match(/output\.([a-zA-Z0-9_.[\]]+)/);
+  return match ? match[1] : '';
+}
+
+function extractPath(value: string, prefix: string): string {
+  const match = value.match(new RegExp(`${prefix}([a-zA-Z0-9_.\\[\\]]+)`));
+  return match ? match[1] : '';
+}
+
+function getPath(obj: any, path: string): any {
+  return path.split('.').reduce((acc, key) => acc?.[key], obj);
+}
+
+function setPath(obj: any, path: string, value: any): any {
+  const keys = path.split('.');
+  const last = keys.pop()!;
+  const target = keys.reduce((acc, key) => {
+    if (!acc[key]) acc[key] = {};
+    return acc[key];
+  }, obj);
+  target[last] = value;
+  return obj;
+}
+
+function parseAttributeValue(value: string): any {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
+  if (/^\d+\.\d+$/.test(value)) return parseFloat(value);
+  return value;
+}
+```
+
+**Layout Loader:**
+
+```typescript
+// packages/layout-runtime/src/layout-loader.ts
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+
+interface LayoutBundle {
+  id: string;
+  format: 'nunjucks' | 'mdx' | 'tsx';
+  template: string;
+  config: Record<string, any>;
+  schema: {
+    input: ZodSchema;
+    output: ZodSchema;
   };
 }
-```
 
-#### 5.2.4 Adjudication Layout Example
-
-```xml
-<Layout id="adjudication-v1" name="Adjudication Layout">
+export async function loadLayout(layoutId: string): Promise<LayoutBundle> {
+  const layoutDir = join(LAYOUTS_DIR, layoutId);
   
-  <!-- Side-by-side comparison of annotations -->
-  <Section direction="row" gap="lg">
-    
-    <!-- Original task -->
-    <Panel flex="1" title="Source Document">
-      <TextDisplay bind:source="$.input.document_text" />
-    </Panel>
-    
-    <!-- All annotations to compare -->
-    <Panel flex="2" title="Annotations to Review">
-      <AnnotationComparison
-        bind:source="$.input.document_text"
-        bind:annotations="$.context.previous_annotations"
-        bind:resolution="$.output.resolved_entities"
-        highlight-conflicts="true"
-      >
-        <!-- Conflict resolution UI -->
-        <ConflictResolver 
-          mode="select-or-edit"
-          on:resolve="onConflictResolved"
-        />
-      </AnnotationComparison>
-    </Panel>
-    
-  </Section>
+  // Determine format by checking which file exists
+  const format = await detectFormat(layoutDir);
   
-  <!-- Agreement metrics -->
-  <Section>
-    <AgreementDisplay 
-      bind:annotations="$.context.previous_annotations"
-      metrics="['krippendorff_alpha', 'percentage']"
-    />
-  </Section>
+  // Load template
+  const templateFile = format === 'nunjucks' ? 'template.njk' 
+                     : format === 'mdx' ? 'template.mdx' 
+                     : 'template.tsx';
+  const template = await readFile(join(layoutDir, templateFile), 'utf-8');
   
-  <!-- Resolution notes -->
-  <Section>
-    <TextArea
-      bind:value="$.output.adjudication_notes"
-      label="Resolution Notes"
-      placeholder="Explain any significant decisions..."
-      required-when="$.context.has_conflicts"
-    />
-  </Section>
+  // Load config
+  const configPath = join(layoutDir, 'config.json');
+  const config = JSON.parse(await readFile(configPath, 'utf-8'));
   
-</Layout>
-```
-
-#### 5.2.5 Layout Compilation
-
-Layouts are compiled to React components at build time or runtime:
-
-```rust
-// crates/domain/layouts/src/compiler.rs
-
-pub struct LayoutCompiler {
-    component_registry: Arc<ComponentRegistry>,
-    validator: LayoutValidator,
-}
-
-impl LayoutCompiler {
-    /// Compile LDL markup to executable React component code
-    pub fn compile(&self, ldl_source: &str) -> Result<CompiledLayout> {
-        // 1. Parse LDL to AST
-        let ast = self.parse(ldl_source)?;
-        
-        // 2. Validate against component schemas
-        self.validator.validate(&ast)?;
-        
-        // 3. Generate React/TypeScript code
-        let react_code = self.generate_react(&ast)?;
-        
-        // 4. Extract data binding metadata
-        let bindings = self.extract_bindings(&ast)?;
-        
-        Ok(CompiledLayout {
-            id: ast.id,
-            react_code,
-            bindings,
-            required_components: ast.component_refs(),
-        })
-    }
+  // Load schema
+  const schemaPath = join(layoutDir, 'schema.json');
+  const schemaJson = JSON.parse(await readFile(schemaPath, 'utf-8'));
+  const schema = {
+    input: jsonSchemaToZod(schemaJson.input),
+    output: jsonSchemaToZod(schemaJson.output),
+  };
+  
+  return { id: layoutId, format, template, config, schema };
 }
 ```
+
+**React Integration:**
 
 ```typescript
-// Frontend: Runtime layout rendering
-function LayoutRenderer({ layoutId, taskData, onSubmit }: LayoutRendererProps) {
-  const { layout, isLoading } = useLayout(layoutId);
-  const [formState, setFormState] = useState({});
+// packages/layout-runtime/src/AnnotationLayout.tsx
+import { useState, useCallback } from 'react';
+import { NunjucksLayout } from './nunjucks-renderer';
+import { MDXLayout } from './mdx-renderer';
+import { validateOutput } from './validation';
+
+interface AnnotationLayoutProps {
+  layout: LayoutBundle;
+  task: Task;
+  onSubmit: (output: any) => void;
+  onSkip: () => void;
+}
+
+export function AnnotationLayout({ layout, task, onSubmit, onSkip }: AnnotationLayoutProps) {
+  const [output, setOutput] = useState<Record<string, any>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
   
-  // Create binding context
-  const bindingContext = useMemo(() => ({
-    input: taskData.input,
-    output: formState,
-    context: taskData.context,
-    ui_context: taskData.uiContext,
-    validation: validate(formState, layout.schema),
-  }), [taskData, formState, layout]);
+  // Build context for template
+  const context: LayoutContext = {
+    input: task.input,
+    output,
+    context: {
+      ai_suggestions: task.aiSuggestions || [],
+      previous_annotations: task.previousAnnotations || [],
+    },
+    config: layout.config,
+    user: getCurrentUser(),
+    task: { id: task.id },
+  };
   
-  if (isLoading) return <LayoutSkeleton />;
+  // Handle output changes
+  const handleChange = useCallback((newOutput: any) => {
+    setOutput(newOutput);
+    // Validate on change
+    const validation = validateOutput(newOutput, layout.schema.output);
+    setErrors(validation.errors);
+  }, [layout.schema]);
   
+  // Handle events (submit, skip, etc.)
+  const handleEvent = useCallback((event: string, payload: any) => {
+    switch (event) {
+      case 'submit':
+        const validation = validateOutput(output, layout.schema.output);
+        if (validation.valid) {
+          onSubmit(output);
+        } else {
+          setErrors(validation.errors);
+        }
+        break;
+      case 'skip':
+        onSkip();
+        break;
+      case 'saveDraft':
+        saveDraft(task.id, output);
+        break;
+      // Custom handlers from layout config
+      default:
+        if (layout.config.handlers?.[event]) {
+          // Execute custom handler logic
+        }
+    }
+  }, [output, layout, task, onSubmit, onSkip]);
+  
+  // Render based on format
+  if (layout.format === 'nunjucks') {
+    return (
+      <NunjucksLayout
+        template={layout.template}
+        data={context}
+        onChange={handleChange}
+        onEvent={handleEvent}
+      />
+    );
+  }
+  
+  if (layout.format === 'mdx') {
+    return (
+      <MDXLayout
+        source={layout.template}
+        data={context}
+        onChange={handleChange}
+        onEvent={handleEvent}
+      />
+    );
+  }
+  
+  // TSX layouts are pre-compiled
+  const TSXComponent = layout.component;
   return (
-    <BindingProvider value={bindingContext} onChange={setFormState}>
-      <LayoutComponent layout={layout} />
-      <SubmitBar onSubmit={() => onSubmit(formState)} />
-    </BindingProvider>
+    <TSXComponent
+      {...context}
+      onChange={handleChange}
+      onEvent={handleEvent}
+    />
   );
 }
 ```
 
-### 5.3 Custom Components
+---
 
-#### 5.3.1 Component Interface
+### 5.5 Layout Validation
 
-```typescript
-interface AnnotationComponent<TInput, TOutput> {
-  // Component metadata
-  id: string;
-  name: string;
-  version: string;
-  
-  // Schema definitions
-  inputSchema: JSONSchema;
-  outputSchema: JSONSchema;
-  propsSchema: JSONSchema;
-  
-  // React component
-  component: React.FC<ComponentProps<TInput, TOutput>>;
-  
-  // Optional hooks
-  onMount?: (context: ComponentContext) => void;
-  onUnmount?: (context: ComponentContext) => void;
-  validate?: (output: TOutput) => ValidationResult;
-}
-
-interface ComponentProps<TInput, TOutput> {
-  // Data
-  input: TInput;
-  value: TOutput;
-  onChange: (value: TOutput) => void;
-  
-  // Context
-  task: Task;
-  step: WorkflowStep;
-  previousAnnotations?: Annotation[];
-  
-  // Configuration
-  props: object;
-  readonly: boolean;
-  
-  // Services
-  services: {
-    ai: AIService;
-    storage: StorageService;
-    api: APIService;
-  };
-}
+```
+LayoutSchema
+├── input: ZodSchema                        # Expected input structure
+├── output: ZodSchema                       # Required output structure
+├── validation_rules: ValidationRule[]      # Custom validation rules
+└── completion_requirements: CompletionRequirement[]  # What must be filled to submit
 ```
 
-#### 5.3.2 Component Registration
+```
+ValidationRule
+├── rule_id: string
+├── field_path: string              # JSONPath to field
+├── type: enum(required, format, range, custom)
+├── params: object                  # Rule-specific parameters
+├── message: string                 # Error message on failure
+└── severity: enum(error, warning)
+```
+
+```
+CompletionRequirement
+├── field: string                   # Field path
+├── rule: enum(required, non_empty, min_length, custom)
+└── params: object                  # Rule-specific parameters
+```
+
+**Example Schema:**
 
 ```typescript
-// Custom component example
-const MedicalCodeSelector: AnnotationComponent<CodeInput, CodeOutput> = {
-  id: 'ensemble/medical-code-selector',
-  name: 'Medical Code Selector',
-  version: '1.0.0',
+// Defined alongside layout
+export const ClinicalNERSchema = {
+  input: z.object({
+    document_text: z.string().min(1),
+    document_id: z.string(),
+    metadata: z.record(z.unknown()).optional(),
+  }),
   
-  inputSchema: {
-    type: 'object',
-    properties: {
-      text: { type: 'string' },
-      suggested_codes: { type: 'array', items: { type: 'string' } }
-    }
-  },
+  output: z.object({
+    entities: z.array(z.object({
+      start: z.number().int().min(0),
+      end: z.number().int().min(0),
+      type: z.string(),
+      text: z.string(),
+    })),
+    confidence: z.enum(['high', 'medium', 'low']),
+    notes: z.string().optional(),
+  }),
   
-  outputSchema: {
-    type: 'object',
-    properties: {
-      selected_codes: { type: 'array', items: { type: 'string' } },
-      confidence: { type: 'number' }
-    }
-  },
-  
-  propsSchema: {
-    type: 'object',
-    properties: {
-      code_system: { type: 'string', enum: ['ICD-10', 'CPT', 'HCPCS'] },
-      max_codes: { type: 'number' },
-      show_hierarchy: { type: 'boolean' }
-    }
-  },
-  
-  component: MedicalCodeSelectorComponent
+  completionRequirements: [
+    { field: 'entities', rule: 'required' },
+    { field: 'confidence', rule: 'required' },
+  ],
 };
-
-// Registration
-componentRegistry.register(MedicalCodeSelector);
 ```
 
-### 5.4 Data Bindings
+---
+
+### 5.6 Layout Inheritance & Versioning
 
 ```
-DataBinding
-├── source: enum(task, previous_step, workflow_context, external)
-├── source_step_id: UUID  # If source is previous_step
-├── path: string  # JSONPath to data
-├── target_component: string  # Component instance_id
-├── target_prop: string  # Which prop to bind to
-├── transform: TransformConfig  # Optional data transformation
-└── default_value: any
+LayoutVersion
+├── layout_id: UUID
+├── version: int
+├── template_source: string        # .njk, .mdx, or .tsx content
+├── config: LayoutConfig
+├── schema_hash: string
+├── created_at: timestamp
+├── created_by: UUID
+├── change_notes: string
+└── status: enum(draft, published, deprecated)
 ```
 
-### 5.5 Layout Inheritance & Copying
+**Version Rules:**
+1. Published layouts are immutable
+2. New versions require migration path if schema changes
+3. Projects reference specific layout versions
+4. Deprecated layouts show warning but continue working
 
-```
-Layout Inheritance Rules:
-1. COPY: Creates independent copy, no link to source
-2. INHERIT: Maintains link, inherits changes, allows overrides
-3. Override precedence: Local > Inherited
-4. Component overrides tracked at instance_id level
+**Inheritance via Includes and Macros:**
+
+Nunjucks supports template inheritance natively:
+
+```html
+{# layouts/base/annotation-base.njk #}
+<Layout id="{{ config.id }}">
+  <Section direction="column" gap="lg">
+    
+    {# Header slot #}
+    {% block header %}
+      <Header level="3">{{ config.title | default("Annotation Task") }}</Header>
+    {% endblock %}
+    
+    {# Instructions slot #}
+    {% block instructions %}{% endblock %}
+    
+    {# Main content slot #}
+    {% block content %}{% endblock %}
+    
+    {# Metadata/form slot #}
+    {% block metadata %}
+      <Section direction="row" gap="md">
+        {% if config.show_confidence %}
+          <Select value="{{ output.confidence }}" label="Confidence" required>
+            <Option value="high">High</Option>
+            <Option value="medium">Medium</Option>
+            <Option value="low">Low</Option>
+          </Select>
+        {% endif %}
+        {% if config.show_notes %}
+          <TextArea value="{{ output.notes }}" label="Notes" />
+        {% endif %}
+      </Section>
+    {% endblock %}
+    
+  </Section>
+</Layout>
 ```
 
+```html
+{# layouts/clinical-ner-v1/template.njk #}
+{% extends "base/annotation-base.njk" %}
+
+{% block instructions %}
+  <Alert variant="info">
+    Tag all medical entities in the document below.
+    Use keyboard shortcuts: {% for et in config.entity_types %}{{ et.hotkey }}={{ et.name }}{{ ", " if not loop.last }}{% endfor %}
+  </Alert>
+{% endblock %}
+
+{% block content %}
+  <TextDisplay source="{{ input.document_text }}" />
+  
+  {% if context.ai_suggestions | length > 0 %}
+    <AISuggestions suggestions="{{ context.ai_suggestions }}" />
+  {% endif %}
+  
+  <NERTagger source="{{ input.document_text }}" value="{{ output.entities }}">
+    {% for et in config.entity_types %}
+      <EntityType name="{{ et.name }}" color="{{ et.color }}" hotkey="{{ et.hotkey }}" />
+    {% endfor %}
+  </NERTagger>
+{% endblock %}
 ```
-LayoutInheritance
-├── child_layout_id: UUID
-├── parent_layout_id: UUID
-├── override_mode: enum(replace, merge)
-└── component_overrides: ComponentOverride[]
+
+**Reusable Macros Library:**
+
+```html
+{# layouts/macros/common.njk #}
+
+{% macro confidenceSelect(value, required=true) %}
+  <Select value="{{ value }}" label="Confidence" required="{{ required }}">
+    <Option value="high">High - Very confident</Option>
+    <Option value="medium">Medium - Some uncertainty</Option>
+    <Option value="low">Low - Significant uncertainty</Option>
+  </Select>
+{% endmacro %}
+
+{% macro entityLegend(entityTypes) %}
+  <Section direction="row" gap="sm" wrap="wrap">
+    {% for et in entityTypes %}
+      <Badge color="{{ et.color }}">
+        {% if et.hotkey %}{{ et.hotkey }}: {% endif %}{{ et.name }}
+      </Badge>
+    {% endfor %}
+  </Section>
+{% endmacro %}
+
+{% macro aiSuggestionsPanel(suggestions) %}
+  {% if suggestions | length > 0 %}
+    <Card variant="outlined">
+      <Header level="4">AI Suggestions ({{ suggestions | length }})</Header>
+      <AISuggestions 
+        suggestions="{{ suggestions | json }}"
+        onAccept="acceptSuggestion"
+        onReject="rejectSuggestion"
+      />
+    </Card>
+  {% endif %}
+{% endmacro %}
+```
+
+```html
+{# Use macros in layouts #}
+{% import "macros/common.njk" as common %}
+
+<Layout id="my-layout">
+  {{ common.entityLegend(config.entity_types) }}
+  
+  <NERTagger source="{{ input.text }}" value="{{ output.entities }}">
+    ...
+  </NERTagger>
+  
+  {{ common.aiSuggestionsPanel(context.ai_suggestions) }}
+  {{ common.confidenceSelect("{{ output.confidence }}") }}
+</Layout>
 ```
 
 ---
 
 ## 6. Task Management
+
+> **Section Summary:** This section defines the core runtime models for tracking individual units of work: Task (with 8-state lifecycle from pending to completed/failed/cancelled, workflow state, and input/output data), WorkflowState and StepState (tracking current position and per-step progress), TaskAssignment (linking users to tasks for specific steps with 6-state lifecycle), and Annotation (the labeled data with 5-state lifecycle, versioning, and complete audit trail via AuditEntry and FieldChange for compliance tracking).
 
 ### 6.1 Task Model
 
@@ -1156,7 +2946,7 @@ Task
 ├── task_id: UUID
 ├── project_id: UUID
 ├── project_type_id: UUID
-├── status: enum(pending, assigned, in_progress, review, adjudication, completed, cancelled)
+├── status: enum(pending, assigned, in_progress, review, adjudication, completed, failed, cancelled)
 ├── priority: int
 ├── input_data: object  # Conforms to project_type.task_schema
 ├── workflow_state: WorkflowState
@@ -1219,9 +3009,31 @@ Annotation
 └── audit_trail: AuditEntry[]
 ```
 
+```
+AuditEntry
+├── entry_id: UUID
+├── timestamp: timestamp
+├── actor_id: UUID                  # User or system that made change
+├── actor_type: enum(user, system, api)
+├── action: enum(created, updated, submitted, approved, rejected, reverted)
+├── changes: FieldChange[]          # What fields changed
+├── reason: string                  # Optional reason for change
+└── metadata: object                # Additional context
+```
+
+```
+FieldChange
+├── field_path: string              # JSONPath to changed field
+├── old_value: any
+├── new_value: any
+└── change_type: enum(added, modified, removed)
+```
+
 ---
 
 ## 7. Quality Management
+
+> **Section Summary:** This section defines the quality measurement and enforcement system, including QualityScore model for tasks/users/projects with confidence intervals, task-level quality with conflict resolution, user-level quality profiles with per-metric trends. It provides a comprehensive evaluation configuration system with 13+ built-in evaluators (agreement metrics like Krippendorff's alpha, IoU, accuracy against gold standards, consistency checks, speed/throughput), custom evaluator plugins via TypeScript SDK, configurable aggregation methods, evaluation scheduling (on-submit, periodic, manual), and quality-based actions (alerts, assignment restrictions, auto-approve rules) triggered by threshold/trend conditions.
 
 ### 7.1 Quality Score Model
 
@@ -1689,6 +3501,8 @@ QualityAction
 
 ## 7A. Annotation Storage Architecture
 
+> **Section Summary:** This section defines the PostgreSQL-based persistence layer with five design principles (write-optimized, read-optimized for exports, flexible JSONB schema, full audit trail, scalable to billions). It covers the complete SQL schema with 21 enum types and partitioned tables (tasks, annotations by project_id hash), event sourcing via annotation_events with monthly partitions, materialized views for analytics, comprehensive instrumentation for interaction events (keystrokes, selections, field changes) with real-time pipeline architecture, training data export schema for ML, storage architecture with Redis coordination, background services for metrics aggregation and exports, streaming export API, data warehouse integration, and data lifecycle management with hot/warm/cold storage tiers.
+
 ### 7A.1 Storage Design Principles
 
 1. **Write-optimized for annotation capture**: High throughput for concurrent annotators
@@ -1702,12 +3516,114 @@ QualityAction
 #### 7A.2.1 Core Annotation Storage
 
 ```sql
+-- Enum types (must be created before tables that use them)
+CREATE TYPE annotation_status AS ENUM ('draft', 'submitted', 'approved', 'rejected', 'superseded');
+CREATE TYPE task_status AS ENUM ('pending', 'assigned', 'in_progress', 'review', 'adjudication', 'completed', 'failed', 'cancelled');
+CREATE TYPE assignment_status AS ENUM ('assigned', 'accepted', 'in_progress', 'submitted', 'expired', 'reassigned');
+CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended');
+CREATE TYPE step_type AS ENUM ('annotation', 'review', 'adjudication', 'auto_process', 'conditional', 'sub_workflow');
+CREATE TYPE step_status AS ENUM ('pending', 'active', 'completed', 'skipped');
+CREATE TYPE actor_type AS ENUM ('user', 'system', 'api');
+CREATE TYPE project_status AS ENUM ('draft', 'active', 'paused', 'completed', 'archived');
+CREATE TYPE goal_type AS ENUM ('volume', 'quality', 'deadline', 'duration', 'composite', 'manual');
+CREATE TYPE quality_entity_type AS ENUM ('task', 'annotation', 'user', 'project');
+
+-- Workflow Configuration Enums (§4 Workflow Engine)
+CREATE TYPE workflow_type AS ENUM ('single', 'multi_vote', 'multi_adjudication', 'custom');
+CREATE TYPE completion_criteria_type AS ENUM ('annotation_count', 'review_decision', 'auto', 'manual');
+CREATE TYPE consensus_method AS ENUM ('majority_vote', 'weighted_vote', 'unanimous');
+CREATE TYPE resolution_strategy AS ENUM ('majority_vote', 'weighted_vote', 'adjudication', 'additional_annotators', 'escalate');
+CREATE TYPE assignment_mode AS ENUM ('auto', 'manual', 'pool');
+CREATE TYPE load_balancing_strategy AS ENUM ('round_robin', 'least_loaded', 'quality_weighted');
+CREATE TYPE contribution_type AS ENUM ('count', 'quality_metric', 'progress');
+CREATE TYPE aggregation_type AS ENUM ('sum', 'latest', 'average', 'min', 'max');
+CREATE TYPE transition_condition_type AS ENUM ('always', 'on_complete', 'on_agreement', 'on_disagreement', 'expression');
+CREATE TYPE timeout_action AS ENUM ('proceed', 'retry', 'escalate');
+
+-- Users table (referenced by annotations and assignments)
+CREATE TABLE users (
+    user_id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email               VARCHAR(255) NOT NULL UNIQUE,
+    display_name        VARCHAR(255) NOT NULL,
+    status              user_status NOT NULL DEFAULT 'active',
+    skills              JSONB DEFAULT '[]',
+    roles               JSONB DEFAULT '[]',
+    quality_profile     JSONB DEFAULT '{}',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_status ON users(status);
+
+-- Quality scores table (stores quality metrics for tasks, users, projects)
+CREATE TABLE quality_scores (
+    score_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    entity_type         quality_entity_type NOT NULL,
+    entity_id           UUID NOT NULL,
+    score_type          VARCHAR(50) NOT NULL,  -- 'agreement', 'accuracy', 'consistency', etc.
+    value               FLOAT NOT NULL,
+    confidence          FLOAT,
+    sample_size         INT NOT NULL DEFAULT 1,
+    evaluator_id        VARCHAR(100),  -- Which evaluator calculated this
+    calculated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    calculation_metadata JSONB DEFAULT '{}',
+    
+    CONSTRAINT valid_score CHECK (value >= 0 AND value <= 1),
+    CONSTRAINT valid_confidence CHECK (confidence IS NULL OR (confidence >= 0 AND confidence <= 1))
+);
+
+CREATE INDEX idx_quality_scores_entity ON quality_scores(entity_type, entity_id);
+CREATE INDEX idx_quality_scores_type ON quality_scores(score_type, calculated_at DESC);
+
+-- Tasks table (partitioned by project)
+CREATE TABLE tasks (
+    task_id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    project_id          UUID NOT NULL,
+    project_type_id     UUID NOT NULL,
+    status              task_status NOT NULL DEFAULT 'pending',
+    priority            INT NOT NULL DEFAULT 0,
+    input_data          JSONB NOT NULL,
+    workflow_state      JSONB NOT NULL DEFAULT '{}',
+    metadata            JSONB DEFAULT '{}',
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at        TIMESTAMPTZ,
+    
+    CONSTRAINT valid_priority CHECK (priority >= -100 AND priority <= 100)
+) PARTITION BY HASH (project_id);
+
+-- Create task partitions
+CREATE TABLE tasks_p0 PARTITION OF tasks FOR VALUES WITH (MODULUS 16, REMAINDER 0);
+CREATE TABLE tasks_p1 PARTITION OF tasks FOR VALUES WITH (MODULUS 16, REMAINDER 1);
+-- ... (partitions 2-15)
+
+-- Task assignments table
+CREATE TABLE task_assignments (
+    assignment_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id             UUID NOT NULL REFERENCES tasks(task_id),
+    step_id             UUID NOT NULL,
+    user_id             UUID NOT NULL,
+    status              assignment_status NOT NULL DEFAULT 'assigned',
+    assigned_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    accepted_at         TIMESTAMPTZ,
+    submitted_at        TIMESTAMPTZ,
+    time_spent_ms       BIGINT,
+    assignment_metadata JSONB DEFAULT '{}',
+    
+    CONSTRAINT unique_user_task_step UNIQUE (task_id, step_id, user_id)
+);
+
+CREATE INDEX idx_assignments_user_status ON task_assignments(user_id, status);
+CREATE INDEX idx_assignments_task ON task_assignments(task_id);
+
 -- Partitioned by project for query isolation and maintenance
 CREATE TABLE annotations (
     annotation_id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     task_id             UUID NOT NULL REFERENCES tasks(task_id),
     step_id             UUID NOT NULL,
     user_id             UUID NOT NULL REFERENCES users(user_id),
+    assignment_id       UUID NOT NULL REFERENCES task_assignments(assignment_id),
     project_id          UUID NOT NULL,  -- Denormalized for partitioning
     
     -- Annotation data stored as JSONB for flexibility
@@ -1824,6 +3740,570 @@ SELECT
 FROM annotations
 WHERE status IN ('submitted', 'approved')
 GROUP BY user_id, project_id;
+```
+
+### 7A.2.4 Instrumentation & Exhaust Data Collection
+
+Comprehensive data collection for productivity analytics, quality improvement, and ML training data generation.
+
+#### 7A.2.4.1 Interaction Events (Fine-Grained Telemetry)
+
+```sql
+-- High-volume interaction events (stored in TimescaleDB or ClickHouse for scale)
+CREATE TABLE interaction_events (
+    event_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id          UUID NOT NULL,              -- Browser session
+    assignment_id       UUID NOT NULL,              -- Links to task_assignment
+    user_id             UUID NOT NULL,
+    
+    -- Event classification
+    event_type          VARCHAR(50) NOT NULL,       -- See enum below
+    event_category      VARCHAR(30) NOT NULL,       -- input, navigation, annotation, system
+    
+    -- Timing (millisecond precision)
+    client_timestamp    TIMESTAMPTZ NOT NULL,       -- When event occurred on client
+    server_timestamp    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    time_since_session_start_ms  BIGINT NOT NULL,   -- Relative timing for replay
+    
+    -- Event-specific payload
+    payload             JSONB NOT NULL,             -- Event details (see below)
+    
+    -- Context for reconstruction
+    dom_snapshot_id     UUID,                       -- Optional: reference to DOM state
+    annotation_state_hash VARCHAR(64),              -- Hash of annotation state at event time
+    
+    -- Indexing
+    occurred_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+) PARTITION BY RANGE (occurred_at);
+
+-- Event types enum (for reference, stored as VARCHAR for flexibility)
+-- Input events:      keystroke, paste, cut, undo, redo
+-- Mouse events:      click, double_click, right_click, drag_start, drag_end, scroll
+-- Selection events:  text_select, entity_select, span_create, span_delete, span_modify
+-- Navigation events: focus, blur, tab_switch, scroll_to_element
+-- Annotation events: field_change, label_apply, label_remove, relation_create, relation_delete
+-- System events:     auto_save, validation_error, hint_shown, shortcut_used
+```
+
+**Event Payload Examples:**
+
+```json
+// keystroke event
+{
+  "event_type": "keystroke",
+  "payload": {
+    "key": "a",
+    "modifiers": ["shift"],
+    "target_field": "entity_text",
+    "cursor_position": 145,
+    "text_before": "The patient presented with",
+    "text_after": "The patient presented withA"
+  }
+}
+
+// span_create event (NER annotation)
+{
+  "event_type": "span_create",
+  "payload": {
+    "span_id": "temp_001",
+    "start_offset": 45,
+    "end_offset": 58,
+    "text": "hypertension",
+    "label": "CONDITION",
+    "method": "keyboard_shortcut",  // vs "click_drag", "suggestion_accept"
+    "time_to_label_ms": 234         // Time from selection to label assignment
+  }
+}
+
+// field_change event
+{
+  "event_type": "field_change",
+  "payload": {
+    "field_path": "$.classification.severity",
+    "old_value": "moderate",
+    "new_value": "severe",
+    "change_method": "dropdown_select",  // vs "keyboard", "autocomplete"
+    "options_viewed": ["mild", "moderate", "severe"],
+    "time_in_dropdown_ms": 1200
+  }
+}
+```
+
+#### 7A.2.4.2 Session & Step Aggregates
+
+```sql
+-- Aggregated metrics per assignment (step-level)
+CREATE TABLE assignment_metrics (
+    assignment_id       UUID PRIMARY KEY REFERENCES task_assignments(assignment_id),
+    user_id             UUID NOT NULL,
+    task_id             UUID NOT NULL,
+    step_id             UUID NOT NULL,
+    
+    -- Timing breakdown
+    total_time_ms       BIGINT NOT NULL,            -- Wall clock time
+    active_time_ms      BIGINT NOT NULL,            -- Excluding idle (>30s gaps)
+    idle_time_ms        BIGINT NOT NULL,            -- Gaps > 30 seconds
+    focus_time_ms       BIGINT NOT NULL,            -- Tab in focus
+    
+    -- Activity metrics
+    total_interactions  INT NOT NULL,               -- Total events
+    keystrokes          INT NOT NULL,
+    clicks              INT NOT NULL,
+    selections          INT NOT NULL,
+    scroll_events       INT NOT NULL,
+    
+    -- Annotation-specific
+    entities_created    INT DEFAULT 0,
+    entities_deleted    INT DEFAULT 0,
+    entities_modified   INT DEFAULT 0,
+    relations_created   INT DEFAULT 0,
+    fields_changed      INT DEFAULT 0,
+    undo_count          INT DEFAULT 0,
+    redo_count          INT DEFAULT 0,
+    
+    -- Corrections & revisions
+    corrections_count   INT DEFAULT 0,              -- Changes after initial annotation
+    revision_cycles     INT DEFAULT 0,              -- Times user revisited completed fields
+    
+    -- Quality signals
+    validation_errors   INT DEFAULT 0,
+    hints_viewed        INT DEFAULT 0,
+    guidelines_accessed INT DEFAULT 0,
+    
+    -- Efficiency metrics
+    actions_per_minute  DECIMAL(8,2),
+    avg_time_per_entity_ms BIGINT,
+    
+    -- Computed at write time
+    computed_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Workflow-level aggregates (per task across all steps)
+CREATE TABLE workflow_execution_metrics (
+    task_id             UUID PRIMARY KEY,
+    workflow_id         UUID NOT NULL,
+    
+    -- Per-step breakdown (JSONB array)
+    step_metrics        JSONB NOT NULL,  -- [{step_id, user_id, time_ms, actions, ...}, ...]
+    
+    -- Workflow totals
+    total_time_ms       BIGINT NOT NULL,
+    total_active_time_ms BIGINT NOT NULL,
+    total_participants  INT NOT NULL,
+    
+    -- Quality trajectory
+    quality_by_step     JSONB,           -- [{step_id, quality_score, agreement}, ...]
+    final_quality_score DECIMAL(5,4),
+    
+    -- Rework metrics
+    rejections          INT DEFAULT 0,
+    escalations         INT DEFAULT 0,
+    reassignments       INT DEFAULT 0,
+    
+    completed_at        TIMESTAMPTZ
+);
+```
+
+#### 7A.2.4.3 Training Data Export Schema
+
+For ML model training, we export comprehensive input→action→output traces:
+
+```sql
+-- Training data export view (materialized for performance)
+CREATE MATERIALIZED VIEW mv_training_data_export AS
+SELECT
+    -- Identifiers (anonymized for export)
+    a.annotation_id,
+    a.task_id,
+    encode(sha256(a.user_id::text::bytea), 'hex') AS user_hash,  -- Anonymized
+    
+    -- Input context
+    t.input_data AS task_input,
+    t.metadata AS task_metadata,
+    ws.config AS workflow_step_config,
+    l.template AS layout_template,
+    
+    -- Output
+    a.data AS annotation_output,
+    a.quality_score,
+    
+    -- Interaction trace (sampled for large tasks)
+    (
+        SELECT jsonb_agg(
+            jsonb_build_object(
+                'ts', time_since_session_start_ms,
+                'type', event_type,
+                'payload', payload
+            ) ORDER BY client_timestamp
+        )
+        FROM interaction_events ie
+        WHERE ie.assignment_id = ta.assignment_id
+        -- Sample: keep all annotation events, sample others at 10%
+        AND (event_category = 'annotation' OR random() < 0.1)
+    ) AS interaction_trace,
+    
+    -- Aggregated metrics
+    am.total_time_ms,
+    am.active_time_ms,
+    am.actions_per_minute,
+    am.corrections_count,
+    am.undo_count,
+    
+    -- Revision history
+    (
+        SELECT jsonb_agg(
+            jsonb_build_object(
+                'ts', occurred_at,
+                'type', event_type,
+                'changes', changes,
+                'snapshot', data_snapshot
+            ) ORDER BY occurred_at
+        )
+        FROM annotation_events ae
+        WHERE ae.annotation_id = a.annotation_id
+    ) AS revision_history,
+    
+    -- Context: what came before in workflow
+    (
+        SELECT jsonb_agg(
+            jsonb_build_object(
+                'step_id', prev_a.step_id,
+                'data', prev_a.data
+            )
+        )
+        FROM annotations prev_a
+        WHERE prev_a.task_id = a.task_id 
+          AND prev_a.created_at < a.created_at
+          AND prev_a.status = 'submitted'
+    ) AS prior_step_outputs
+    
+FROM annotations a
+JOIN tasks t ON a.task_id = t.task_id
+JOIN task_assignments ta ON a.assignment_id = ta.assignment_id
+JOIN workflow_steps ws ON a.step_id = ws.step_id
+JOIN layouts l ON ws.layout_id = l.layout_id
+LEFT JOIN assignment_metrics am ON ta.assignment_id = am.assignment_id
+WHERE a.status IN ('submitted', 'approved')
+  AND a.submitted_at > NOW() - INTERVAL '90 days';  -- Rolling window
+```
+
+#### 7A.2.4.4 Real-Time Instrumentation Pipeline
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        Instrumentation Pipeline                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  ┌──────────┐    ┌─────────────┐    ┌──────────────┐    ┌──────────────┐   │
+│  │ Browser  │───▶│  WebSocket  │───▶│   Event      │───▶│  ClickHouse/ │   │
+│  │  Client  │    │   Gateway   │    │   Router     │    │  TimescaleDB │   │
+│  └──────────┘    └─────────────┘    └──────┬───────┘    └──────────────┘   │
+│       │                                     │                               │
+│       │ Batch every 5s                      │ Real-time                     │
+│       │ or 100 events                       ▼                               │
+│       │                            ┌──────────────┐                         │
+│       │                            │    Redis     │                         │
+│       │                            │  (Pub/Sub)   │                         │
+│       │                            └──────┬───────┘                         │
+│       │                                   │                                 │
+│       ▼                                   ▼                                 │
+│  ┌──────────┐                     ┌──────────────┐    ┌──────────────┐     │
+│  │  Local   │                     │  Aggregation │───▶│  PostgreSQL  │     │
+│  │ Storage  │                     │   Service    │    │  (metrics)   │     │
+│  │(IndexedDB)│                    └──────────────┘    └──────────────┘     │
+│  └──────────┘                                                              │
+│       │                                                                     │
+│       └── Offline support: sync when reconnected                           │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Client-Side Collection (TypeScript):**
+
+```typescript
+interface InstrumentationConfig {
+  // Sampling rates (0.0 - 1.0)
+  keystrokeSampleRate: number;     // 1.0 = capture all keystrokes
+  scrollSampleRate: number;        // 0.1 = sample 10% of scroll events
+  mousemoveSampleRate: number;     // 0.01 = sample 1% of mouse moves
+  
+  // Batching
+  batchSize: number;               // Events per batch (default: 100)
+  batchIntervalMs: number;         // Max time between sends (default: 5000)
+  
+  // Privacy
+  excludeFields: string[];         // ['password', 'ssn', 'credit_card']
+  hashPII: boolean;                // Hash personally identifiable text
+  
+  // Storage
+  maxLocalStorageEvents: number;   // IndexedDB limit for offline (default: 10000)
+}
+
+class InstrumentationService {
+  private eventBuffer: InteractionEvent[] = [];
+  private sessionId: string;
+  private sessionStartTime: number;
+  private lastAnnotationStateHash: string;
+  
+  recordEvent(event: Omit<InteractionEvent, 'session_id' | 'time_since_session_start_ms'>) {
+    const enrichedEvent: InteractionEvent = {
+      ...event,
+      session_id: this.sessionId,
+      time_since_session_start_ms: Date.now() - this.sessionStartTime,
+      annotation_state_hash: this.lastAnnotationStateHash,
+    };
+    
+    this.eventBuffer.push(enrichedEvent);
+    
+    if (this.eventBuffer.length >= this.config.batchSize) {
+      this.flush();
+    }
+  }
+  
+  // Specialized recorders for common events
+  recordKeystroke(key: string, modifiers: string[], targetField: string, cursorPos: number): void;
+  recordSpanCreate(span: Span, method: 'keyboard' | 'mouse' | 'suggestion'): void;
+  recordFieldChange(path: string, oldVal: any, newVal: any, method: string): void;
+  recordUndo(): void;
+  recordRedo(): void;
+  
+  // Compute session metrics on completion
+  computeSessionMetrics(): AssignmentMetrics;
+}
+```
+
+#### 7A.2.4.5 Training Data Export Pipeline
+
+The export pipeline is **orchestrator-agnostic** — it exposes a standard interface that any DAG tool can invoke.
+
+**Pipeline Steps (Orchestrator-Independent):**
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     Training Data Export Pipeline                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Step 1              Step 2              Step 3              Step 4         │
+│  ┌──────────┐       ┌──────────┐       ┌──────────┐       ┌──────────┐     │
+│  │ Refresh  │──────▶│  Export  │──────▶│  Upload  │──────▶│ Register │     │
+│  │  Views   │       │ to File  │       │ to Store │       │ Catalog  │     │
+│  └──────────┘       └──────────┘       └──────────┘       └──────────┘     │
+│       │                  │                  │                  │            │
+│       ▼                  ▼                  ▼                  ▼            │
+│   POST /api/         POST /api/         POST /api/         POST /api/      │
+│   export/refresh     export/run         export/upload      export/catalog  │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Export API (REST endpoints for any orchestrator):**
+
+```yaml
+# Platform exposes these endpoints for orchestration
+export_api:
+  base_url: /api/v1/export
+  
+  endpoints:
+    # Step 1: Refresh materialized views
+    - path: /refresh-views
+      method: POST
+      params:
+        views: [mv_training_data_export, mv_user_quality_summary]
+      returns: { status, rows_affected, duration_ms }
+    
+    # Step 2: Export to file format
+    - path: /run
+      method: POST
+      params:
+        format: parquet | jsonl | tfrecord | huggingface
+        partitions: [project_id, date]
+        compression: snappy | gzip | zstd
+        date_range: { start, end }
+        project_ids: []  # optional filter
+      returns: { export_id, file_paths[], row_count, size_bytes }
+    
+    # Step 3: Upload to storage
+    - path: /upload
+      method: POST
+      params:
+        export_id: uuid
+        destination:
+          type: s3 | gcs | azure | local
+          bucket: string
+          prefix: string
+      returns: { urls[], etags[] }
+    
+    # Step 4: Register in catalog
+    - path: /catalog
+      method: POST
+      params:
+        export_id: uuid
+        catalog_type: glue | iceberg | delta | unity | custom
+        table_name: string
+      returns: { catalog_entry_id, table_version }
+    
+    # Convenience: Run full pipeline
+    - path: /pipeline
+      method: POST
+      params:
+        # All params from above steps
+      returns: { pipeline_run_id, steps_completed[], final_urls[] }
+
+  # Webhook callback for async completion
+  webhooks:
+    on_complete: POST {callback_url} with { export_id, status, urls[] }
+    on_error: POST {callback_url} with { export_id, error, step_failed }
+```
+
+**Orchestrator Integrations:**
+
+| Orchestrator | Integration Method | Configuration |
+|--------------|-------------------|---------------|
+| **Airflow** (default) | PythonOperator calling REST API | DAG template provided |
+| **Databricks** | Notebook/Job calling REST API | Notebook template provided |
+| **Prefect** | @task decorators calling REST API | Flow template provided |
+| **Dagster** | @op / @asset calling REST API | Asset template provided |
+| **Custom/In-house** | Direct curl/HTTP calls | Shell script template |
+| **Cron + Script** | Bash script with curl | Minimal dependency |
+
+**Example: Airflow DAG (Default)**
+
+```python
+# dags/training_data_export.py
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from datetime import datetime
+import requests
+
+EXPORT_API = "https://annotation-platform.internal/api/v1/export"
+
+def refresh_views():
+    resp = requests.post(f"{EXPORT_API}/refresh-views", 
+        json={"views": ["mv_training_data_export"]})
+    resp.raise_for_status()
+    return resp.json()
+
+def export_data(**context):
+    resp = requests.post(f"{EXPORT_API}/run", json={
+        "format": "parquet",
+        "partitions": ["project_id", "date"],
+        "date_range": {"start": context["ds"], "end": context["ds"]}
+    })
+    resp.raise_for_status()
+    return resp.json()["export_id"]
+
+def upload_to_s3(**context):
+    export_id = context["ti"].xcom_pull(task_ids="export_data")
+    resp = requests.post(f"{EXPORT_API}/upload", json={
+        "export_id": export_id,
+        "destination": {"type": "s3", "bucket": "ml-training-data", "prefix": f"exhaust/{context['ds']}/"}
+    })
+    resp.raise_for_status()
+
+with DAG("training_data_export", schedule="0 2 * * *", start_date=datetime(2025, 1, 1)):
+    t1 = PythonOperator(task_id="refresh_views", python_callable=refresh_views)
+    t2 = PythonOperator(task_id="export_data", python_callable=export_data)
+    t3 = PythonOperator(task_id="upload_to_s3", python_callable=upload_to_s3)
+    t1 >> t2 >> t3
+```
+
+**Example: Databricks Notebook**
+
+```python
+# Databricks notebook: training_data_export
+import requests
+
+EXPORT_API = dbutils.secrets.get("annotation-platform", "export_api_url")
+API_KEY = dbutils.secrets.get("annotation-platform", "api_key")
+headers = {"Authorization": f"Bearer {API_KEY}"}
+
+# Step 1: Refresh
+requests.post(f"{EXPORT_API}/refresh-views", headers=headers, 
+    json={"views": ["mv_training_data_export"]}).raise_for_status()
+
+# Step 2: Export
+export_resp = requests.post(f"{EXPORT_API}/run", headers=headers, json={
+    "format": "parquet",
+    "partitions": ["project_id", "date"]
+}).json()
+
+# Step 3: Upload to Unity Catalog location
+requests.post(f"{EXPORT_API}/upload", headers=headers, json={
+    "export_id": export_resp["export_id"],
+    "destination": {"type": "azure", "container": "ml-data", "prefix": "annotation-exhaust/"}
+}).raise_for_status()
+
+# Step 4: Register in Unity Catalog
+requests.post(f"{EXPORT_API}/catalog", headers=headers, json={
+    "export_id": export_resp["export_id"],
+    "catalog_type": "unity",
+    "table_name": "ml_catalog.training.annotation_exhaust"
+}).raise_for_status()
+```
+
+**Example: Custom/Curl (Minimal Dependencies)**
+
+```bash
+#!/bin/bash
+# export_training_data.sh - Run via cron or any scheduler
+
+set -euo pipefail
+EXPORT_API="${EXPORT_API_URL:-http://localhost:8080/api/v1/export}"
+AUTH_HEADER="Authorization: Bearer ${EXPORT_API_KEY}"
+DATE=$(date +%Y-%m-%d)
+
+echo "Step 1: Refreshing views..."
+curl -sf -X POST "$EXPORT_API/refresh-views" \
+  -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+  -d '{"views": ["mv_training_data_export"]}'
+
+echo "Step 2: Exporting data..."
+EXPORT_ID=$(curl -sf -X POST "$EXPORT_API/run" \
+  -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+  -d "{\"format\": \"parquet\", \"partitions\": [\"project_id\", \"date\"]}" \
+  | jq -r '.export_id')
+
+echo "Step 3: Uploading to S3..."
+curl -sf -X POST "$EXPORT_API/upload" \
+  -H "$AUTH_HEADER" -H "Content-Type: application/json" \
+  -d "{\"export_id\": \"$EXPORT_ID\", \"destination\": {\"type\": \"s3\", \"bucket\": \"ml-training-data\", \"prefix\": \"exhaust/$DATE/\"}}"
+
+echo "Export complete: $EXPORT_ID"
+```
+
+**Export Formats:**
+
+| Format | Use Case | Size |
+|--------|----------|------|
+| Parquet | ML training pipelines (Spark, PyTorch) | Compressed, columnar |
+| JSONL | Streaming, LLM fine-tuning | Line-delimited JSON |
+| TFRecord | TensorFlow training | Optimized for TF |
+| HuggingFace Dataset | Transformers fine-tuning | Arrow format |
+
+#### 7A.2.4.6 Privacy & Compliance
+
+```yaml
+data_retention:
+  interaction_events:
+    hot_storage: 30 days      # ClickHouse/TimescaleDB
+    warm_storage: 90 days     # Compressed Parquet in S3
+    cold_storage: 1 year      # Glacier
+    deletion: after 1 year    # GDPR compliance
+  
+  training_exports:
+    retention: 2 years        # Model reproducibility
+    anonymization: required   # No raw user IDs
+    
+anonymization_rules:
+  - field: user_id
+    method: sha256_hash
+    salt: per_export_rotating
+  - field: ip_address
+    method: drop
+  - field: user_agent
+    method: generalize        # "Chrome/Windows" not full string
+  - field: free_text_fields
+    method: pii_redaction     # NER-based PII detection
 ```
 
 ### 7A.3 Storage Architecture
@@ -2460,6 +4940,8 @@ data_lifecycle:
 
 ## 8. Dashboard & Reporting
 
+> **Section Summary:** This section defines the UI for monitoring and managing annotation work. It starts with the Workflow Interaction UI (§8.0): interactive DAG visualization of workflow steps with progress bars, access-controlled step boxes showing lock states and assignment counts, annotator click behavior (task assignment flow), admin click behavior (task list management with filtering/bulk actions), evict/reassign dialogs, task state machine, and real-time WebSocket updates. The Dashboard Views (§8.1) cover user dashboards (quality/volume metrics, trends), team dashboards (leaderboards, workload distribution, SLA compliance), project dashboards (completion progress, bottlenecks, adjudication summary), and executive rollup views with hierarchical aggregation from task→user→team→project→organization.
+
 ### 8.0 Workflow Interaction UI
 
 #### 8.0.1 Project Workflow View
@@ -2500,6 +4982,8 @@ When a user opens a project, they see an interactive DAG visualization of the wo
 ```
 
 #### 8.0.2 Step Box Component
+
+> **Note:** The following UI component examples use pseudocode with reactive binding notation (`bind:`, `:prop=`) to describe behavior. These are **platform internal UI components** (built in React/TypeScript), not annotation layouts (which use Nunjucks templates).
 
 ```xml
 <StepBox 
@@ -2955,6 +5439,8 @@ Rollup Dimensions:
 
 ## 9. Extensibility & Hooks
 
+> **Section Summary:** This section defines the plugin system for customization without core code changes. It covers the HookRegistry architecture with four hook types: workflow hooks (lifecycle and transition events), step hooks (preProcess for AI prefill/data enrichment, postProcess for validation/external API calls, validation hooks), UI hooks (AI assist, field-level interactions, real-time suggestions), and interactive layout hooks (live code lookup, dependent field updates). Configuration is YAML-based, and a library of 9 built-in hooks covers common patterns like AI prefill, external API calls, ML inference, and notifications.
+
 ### 9.1 Hook System Architecture
 
 ```
@@ -3172,6 +5658,8 @@ const codeLookupHook: InteractiveHooks = {
 
 ## 10. Integration & API
 
+> **Section Summary:** This section defines external system connectivity through a comprehensive REST API covering users, teams, projects, tasks, annotations, workflows, layouts, hooks, reports, and components with standard CRUD operations plus specialized endpoints (quality metrics, dashboards, export). It includes an event system with 10 core events (task.created, annotation.submitted, workflow.completed, etc.) for real-time notifications, and webhook configuration with retry policies and signature verification for external system integration.
+
 ### 10.1 REST API Endpoints
 
 ```
@@ -3276,6 +5764,8 @@ Webhook
 
 ## 11. Security & Compliance
 
+> **Section Summary:** This section covers authentication (SSO via SAML 2.0/OIDC, API keys, JWT sessions, MFA), authorization (RBAC from §2, resource-level permissions, API scopes), comprehensive audit logging with actor/action/resource/IP tracking, data protection (AES-256 at rest, TLS 1.3 in transit, PII field-level encryption, retention policies, right to deletion), and compliance features for HIPAA-compatible audit trails, data lineage, access logging, and audit exports.
+
 ### 11.1 Authentication
 - SSO integration (SAML 2.0, OIDC)
 - API key authentication for service accounts
@@ -3322,6 +5812,8 @@ AuditLog
 
 ## 12. Non-Functional Requirements
 
+> **Section Summary:** This section specifies system targets for performance (task assignment <100ms, layout rendering <500ms, annotation submission <200ms, dashboard load <2s, 10,000+ concurrent users), scalability (horizontal API scaling, queue-based distribution, partitioned storage, CDN), availability (99.9% uptime SLA, graceful degradation, multi-region option, automated failover), and observability (structured logging, distributed tracing, metrics collection, alerting integration).
+
 ### 12.1 Performance
 - Task assignment: < 100ms
 - Layout rendering: < 500ms
@@ -3350,6 +5842,8 @@ AuditLog
 ---
 
 ## 13. Technical Architecture
+
+> **Section Summary:** This section provides implementation details for the platform. It specifies the technology stack (Rust/Axum backend, PostgreSQL, Redis for coordination, NATS message bus, React/TypeScript frontend, WASM/Deno plugin runtimes). The backend architecture (§13.2) includes complete Cargo.toml dependencies, project structure with crates for api/domain/plugins/infrastructure/shared, and all shared types with `#[typeshare]` for TypeScript generation (User, Task, Annotation, QualityScore, all status enums including the 10 workflow configuration enums). The frontend architecture (§13.3) covers package.json dependencies and project structure. The plugin system (§13.4) defines WIT interfaces for WASM interop, WASM and JavaScript plugin runtimes with sandboxing, the TypeScript Plugin SDK, example plugins (WASM AI prefill, JS external validation), frontend plugin loader, security model with capability-based permissions, and plugin configuration.
 
 ### 13.1 Technology Stack Overview
 
@@ -3591,11 +6085,92 @@ pub struct User {
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSkill {
+    pub skill_id: Uuid,
+    pub name: String,
+    pub proficiency_level: ProficiencyLevel,
+    pub certified_at: Option<DateTime<Utc>>,
+    pub expires_at: Option<DateTime<Utc>>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProficiencyLevel {
+    Novice,
+    Intermediate,
+    Advanced,
+    Expert,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Role {
+    Annotator,
+    Reviewer,
+    Adjudicator,
+    TeamLead,
+    TeamManager,
+    ProjectAdmin,
+    SystemAdmin,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UserStatus {
     Active,
     Inactive,
     Suspended,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectStatus {
+    Draft,
+    Active,
+    Paused,
+    Completed,
+    Archived,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GoalType {
+    Volume,
+    Quality,
+    Deadline,
+    Duration,
+    Composite,
+    Manual,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TaskStatus {
+    Pending,
+    Assigned,
+    InProgress,
+    Review,
+    Adjudication,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AnnotationStatus {
+    Draft,
+    Submitted,
+    Approved,
+    Rejected,
+    Superseded,
 }
 
 #[typeshare]
@@ -3608,8 +6183,47 @@ pub struct Task {
     pub priority: i32,
     pub input_data: serde_json::Value,
     pub workflow_state: WorkflowState,
+    pub metadata: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
+}
+
+/// Task with expanded relations (for API responses)
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskWithRelations {
+    #[serde(flatten)]
+    pub task: Task,
+    pub assignments: Vec<TaskAssignment>,
+    pub annotations: Vec<Annotation>,
+    pub quality_scores: Vec<QualityScore>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskAssignment {
+    pub id: Uuid,
+    pub task_id: Uuid,
+    pub step_id: Uuid,
+    pub user_id: Uuid,
+    pub status: AssignmentStatus,
+    pub assigned_at: DateTime<Utc>,
+    pub accepted_at: Option<DateTime<Utc>>,
+    pub submitted_at: Option<DateTime<Utc>>,
+    pub time_spent_ms: Option<i64>,
+    pub assignment_metadata: serde_json::Value,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AssignmentStatus {
+    Assigned,
+    Accepted,
+    InProgress,
+    Submitted,
+    Expired,
+    Reassigned,
 }
 
 #[typeshare]
@@ -3619,10 +6233,238 @@ pub struct Annotation {
     pub task_id: Uuid,
     pub step_id: Uuid,
     pub user_id: Uuid,
+    pub assignment_id: Uuid,
     pub data: serde_json::Value,
     pub status: AnnotationStatus,
     pub submitted_at: Option<DateTime<Utc>>,
     pub version: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Annotation with expanded audit trail (for detailed views)
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AnnotationWithAudit {
+    #[serde(flatten)]
+    pub annotation: Annotation,
+    pub audit_trail: Vec<AuditEntry>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditEntry {
+    pub id: Uuid,
+    pub timestamp: DateTime<Utc>,
+    pub actor_id: Uuid,
+    pub actor_type: ActorType,
+    pub action: AuditAction,
+    pub changes: Vec<FieldChange>,
+    pub reason: Option<String>,
+    pub metadata: serde_json::Value,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ActorType {
+    User,
+    System,
+    Api,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuditAction {
+    Created,
+    Updated,
+    Submitted,
+    Approved,
+    Rejected,
+    Reverted,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FieldChange {
+    pub field_path: String,
+    pub old_value: Option<serde_json::Value>,
+    pub new_value: Option<serde_json::Value>,
+    pub change_type: ChangeType,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChangeType {
+    Added,
+    Modified,
+    Removed,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct QualityScore {
+    pub id: Uuid,
+    pub entity_type: QualityEntityType,
+    pub entity_id: Uuid,
+    pub score_type: String,
+    pub value: f64,
+    pub confidence: Option<f64>,
+    pub sample_size: i32,
+    pub evaluated_at: DateTime<Utc>,
+    pub evaluator_id: Option<String>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QualityEntityType {
+    Task,
+    Annotation,
+    User,
+    Project,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowState {
+    pub current_step_id: Uuid,
+    pub step_states: std::collections::HashMap<Uuid, StepState>,
+    pub context: serde_json::Value,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StepState {
+    pub status: StepStatus,
+    pub started_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<DateTime<Utc>>,
+    pub attempts: i32,
+    pub output: Option<serde_json::Value>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StepStatus {
+    Pending,
+    Active,
+    Completed,
+    Skipped,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StepType {
+    Annotation,
+    Review,
+    Adjudication,
+    AutoProcess,
+    Conditional,
+    SubWorkflow,
+}
+
+// Workflow Configuration Enums (§4 Workflow Engine)
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowType {
+    Single,
+    MultiVote,
+    MultiAdjudication,
+    Custom,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CompletionCriteriaType {
+    AnnotationCount,
+    ReviewDecision,
+    Auto,
+    Manual,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ConsensusMethod {
+    MajorityVote,
+    WeightedVote,
+    Unanimous,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolutionStrategy {
+    MajorityVote,
+    WeightedVote,
+    Adjudication,
+    AdditionalAnnotators,
+    Escalate,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AssignmentMode {
+    Auto,
+    Manual,
+    Pool,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LoadBalancingStrategy {
+    RoundRobin,
+    LeastLoaded,
+    QualityWeighted,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContributionType {
+    Count,
+    QualityMetric,
+    Progress,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AggregationType {
+    Sum,
+    Latest,
+    Average,
+    Min,
+    Max,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransitionConditionType {
+    Always,
+    OnComplete,
+    OnAgreement,
+    OnDisagreement,
+    Expression,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TimeoutAction {
+    Proceed,
+    Retry,
+    Escalate,
 }
 ```
 
@@ -3865,8 +6707,21 @@ interface types {
     record task {
         id: string,
         project-id: string,
+        status: task-status,
+        priority: s32,
         input-data: string,  // JSON
         metadata: string,    // JSON
+    }
+    
+    enum task-status {
+        pending,
+        assigned,
+        in-progress,
+        review,
+        adjudication,
+        completed,
+        failed,
+        cancelled,
     }
     
     record annotation {
@@ -3883,6 +6738,7 @@ interface types {
         submitted,
         approved,
         rejected,
+        superseded,
     }
     
     record step-context {
@@ -4188,12 +7044,66 @@ deno_core::extension!(
 ```typescript
 // plugins/sdk-typescript/src/index.ts
 
+// ============================================================================
+// Status Enums (must match §6 canonical definitions)
+// ============================================================================
+
+export type TaskStatus = 'pending' | 'assigned' | 'in_progress' | 'review' | 'adjudication' | 'completed' | 'failed' | 'cancelled';
+export type AnnotationStatus = 'draft' | 'submitted' | 'approved' | 'rejected' | 'superseded';
+export type AssignmentStatus = 'assigned' | 'accepted' | 'in_progress' | 'submitted' | 'expired' | 'reassigned';
+export type StepStatus = 'pending' | 'active' | 'completed' | 'skipped';
+export type StepType = 'annotation' | 'review' | 'adjudication' | 'auto_process' | 'conditional' | 'sub_workflow';
+export type ActorType = 'user' | 'system' | 'api';
+export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type ProjectStatus = 'draft' | 'active' | 'paused' | 'completed' | 'archived';
+export type GoalType = 'volume' | 'quality' | 'deadline' | 'duration' | 'composite' | 'manual';
+
+// Workflow Configuration Enums (§4 Workflow Engine)
+export type WorkflowType = 'single' | 'multi_vote' | 'multi_adjudication' | 'custom';
+export type CompletionCriteriaType = 'annotation_count' | 'review_decision' | 'auto' | 'manual';
+export type ConsensusMethod = 'majority_vote' | 'weighted_vote' | 'unanimous';
+export type ResolutionStrategy = 'majority_vote' | 'weighted_vote' | 'adjudication' | 'additional_annotators' | 'escalate';
+export type AssignmentMode = 'auto' | 'manual' | 'pool';
+export type LoadBalancingStrategy = 'round_robin' | 'least_loaded' | 'quality_weighted';
+export type ContributionType = 'count' | 'quality_metric' | 'progress';
+export type AggregationType = 'sum' | 'latest' | 'average' | 'min' | 'max';
+export type TransitionConditionType = 'always' | 'on_complete' | 'on_agreement' | 'on_disagreement' | 'expression';
+export type TimeoutAction = 'proceed' | 'retry' | 'escalate';
+
+// ============================================================================
+// Core Models (must match §6 canonical definitions)
+// ============================================================================
+
 export interface Task {
   id: string;
   projectId: string;
   projectTypeId: string;
+  status: TaskStatus;
+  priority: number;
   inputData: Record<string, unknown>;
+  workflowState: WorkflowState;
   metadata: Record<string, unknown>;
+  createdAt: string;  // ISO timestamp
+  completedAt?: string;
+}
+
+export interface TaskWithRelations extends Task {
+  assignments: TaskAssignment[];
+  annotations: Annotation[];
+  qualityScores: QualityScore[];
+}
+
+export interface TaskAssignment {
+  id: string;
+  taskId: string;
+  stepId: string;
+  userId: string;
+  status: AssignmentStatus;
+  assignedAt: string;
+  acceptedAt?: string;
+  submittedAt?: string;
+  timeSpentMs?: number;
+  assignmentMetadata: Record<string, unknown>;
 }
 
 export interface Annotation {
@@ -4201,13 +7111,71 @@ export interface Annotation {
   taskId: string;
   stepId: string;
   userId: string;
+  assignmentId: string;
   data: Record<string, unknown>;
-  status: 'draft' | 'submitted' | 'approved' | 'rejected';
+  status: AnnotationStatus;
+  submittedAt?: string;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
 }
+
+export interface AnnotationWithAudit extends Annotation {
+  auditTrail: AuditEntry[];
+}
+
+export interface AuditEntry {
+  id: string;
+  timestamp: string;
+  actorId: string;
+  actorType: ActorType;
+  action: 'created' | 'updated' | 'submitted' | 'approved' | 'rejected' | 'reverted';
+  changes: FieldChange[];
+  reason?: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface FieldChange {
+  fieldPath: string;
+  oldValue?: unknown;
+  newValue?: unknown;
+  changeType: 'added' | 'modified' | 'removed';
+}
+
+export interface WorkflowState {
+  currentStepId: string;
+  stepStates: Record<string, StepState>;
+  context: Record<string, unknown>;
+}
+
+export interface StepState {
+  status: StepStatus;
+  startedAt?: string;
+  completedAt?: string;
+  attempts: number;
+  output?: Record<string, unknown>;
+}
+
+export interface QualityScore {
+  id: string;
+  entityType: 'task' | 'annotation' | 'user' | 'project';
+  entityId: string;
+  scoreType: string;
+  value: number;
+  confidence?: number;
+  sampleSize: number;
+  evaluatedAt: string;
+  evaluatorId?: string;
+}
+
+// ============================================================================
+// Plugin Context Types
+// ============================================================================
 
 export interface StepContext {
   stepId: string;
   stepName: string;
+  stepType: StepType;
   workflowId: string;
   previousAnnotations: Annotation[];
   workflowContext: Record<string, unknown>;
@@ -4546,6 +7514,8 @@ plugins:
 
 ## Appendix A: Glossary
 
+> **Section Summary:** Defines key domain terms used throughout the document: Annotation, Adjudication, Layout, Project Type, Skill, Workflow, Hook, and Gold Standard.
+
 | Term | Definition |
 |------|------------|
 | Annotation | The labeled output produced by an annotator for a task |
@@ -4560,6 +7530,8 @@ plugins:
 ---
 
 ## Appendix B: Example Configurations
+
+> **Section Summary:** Provides five complete, production-ready configuration examples: B.1 Medical Coding Workflow (multi-annotation with consensus, volume/quality/deadline/composite goals, AI prefill hooks), B.2 Continuous Labeling Project (volume + deadline goals, quality-weighted load balancing), B.3 Quality-Driven NER Project (sustained quality goal, manual signoff, consensus config), B.4 NER Annotation Layout (complete Nunjucks template with entity types, confidence selector, JSON schema), and B.5 Quality Evaluator Configuration (Krippendorff's alpha, medical coding accuracy, completeness evaluators with threshold rules).
 
 ### B.1 Medical Coding Workflow
 
@@ -4894,76 +7866,75 @@ plugins:
 
 ### B.4 NER Annotation Layout
 
-```xml
-<Layout id="clinical-ner-v1" name="Clinical NER Layout" version="1">
+```html
+{# layouts/clinical-ner-v1.njk #}
+{# Clinical NER Layout - Nunjucks Template #}
+
+<Layout id="clinical-ner-v1">
   
-  <!-- Task metadata header -->
+  {# Task metadata header #}
   <Section direction="row" justify="between" padding="sm" background="subtle">
-    <Text bind:content="$.input.document_id" variant="mono" size="sm" />
-    <Badge bind:variant="$.input.priority">
-      <Text bind:content="$.input.priority" />
-    </Badge>
+    <Text variant="mono" size="sm">{{ input.document_id }}</Text>
+    <Badge variant="{{ input.priority }}">{{ input.priority | capitalize }}</Badge>
   </Section>
   
-  <!-- Main content area -->
+  {# Main content area #}
   <Section direction="column" gap="lg" padding="md" flex="1">
     
-    <!-- Document display -->
+    {# Document display #}
     <Panel title="Source Document" collapsible="false">
       <TextDisplay 
-        bind:source="$.input.document_text"
+        source="{{ input.document_text }}"
         format="plain"
-        :highlight-ranges="$.ui_context.ai_highlights"
+        highlightRanges="{{ context.ai_highlights | json }}"
         font="reading"
       />
     </Panel>
     
-    <!-- NER annotation -->
+    {# NER annotation #}
     <Panel title="Entity Annotation" flex="1">
       <NERTagger
-        bind:source="$.input.document_text"
-        bind:value="$.output.entities"
-        :allow-overlapping="false"
-        show-entity-count="true"
+        source="{{ input.document_text }}"
+        value="{{ output.entities }}"
+        allowOverlapping="false"
+        showEntityCount="true"
       >
-        <EntityType name="Diagnosis" color="#FF6B6B" hotkey="d">
-          <Description>Medical diagnoses and conditions</Description>
-          <Examples>diabetes, hypertension, pneumonia</Examples>
-        </EntityType>
-        <EntityType name="Medication" color="#4ECDC4" hotkey="m">
-          <Description>Drug names and dosages</Description>
-          <Examples>metformin 500mg, lisinopril</Examples>
-        </EntityType>
-        <EntityType name="Procedure" color="#45B7D1" hotkey="p">
-          <Description>Medical procedures and tests</Description>
-          <Examples>MRI, blood panel, appendectomy</Examples>
-        </EntityType>
-        <EntityType name="Anatomy" color="#96CEB4" hotkey="a">
-          <Description>Body parts and anatomical structures</Description>
-          <Examples>left ventricle, femur, lungs</Examples>
-        </EntityType>
+        {% for et in config.entity_types %}
+          <EntityType 
+            name="{{ et.name }}" 
+            color="{{ et.color }}" 
+            hotkey="{{ et.hotkey }}"
+          >
+            {% if et.description %}
+              <Description>{{ et.description }}</Description>
+            {% endif %}
+            {% if et.examples %}
+              <Examples>{{ et.examples }}</Examples>
+            {% endif %}
+          </EntityType>
+        {% endfor %}
       </NERTagger>
       
-      <!-- AI suggestions panel -->
-      <Show when="$.ui_context.ai_predictions.length > 0">
+      {# AI suggestions panel #}
+      {% if context.ai_predictions | length > 0 %}
         <Divider margin="md" />
         <AIAssistPanel 
-          bind:predictions="$.ui_context.ai_predictions"
-          on:accept="acceptPrediction"
-          on:reject="rejectPrediction"
+          predictions="{{ context.ai_predictions | json }}"
+          onAccept="acceptPrediction"
+          onReject="rejectPrediction"
           title="AI Suggestions"
         />
-      </Show>
+      {% endif %}
     </Panel>
     
   </Section>
   
-  <!-- Bottom metadata -->
+  {# Bottom metadata #}
   <Section direction="row" gap="md" padding="md">
     <Select
-      bind:value="$.output.confidence"
+      value="{{ output.confidence }}"
       label="Confidence"
-      required="true"
+      required
       flex="1"
     >
       <Option value="high">High</Option>
@@ -4972,7 +7943,7 @@ plugins:
     </Select>
     
     <Select
-      bind:value="$.output.document_quality"
+      value="{{ output.document_quality }}"
       label="Document Quality"
       flex="1"
     >
@@ -4982,24 +7953,98 @@ plugins:
     </Select>
     
     <TextArea
-      bind:value="$.output.notes"
+      value="{{ output.notes }}"
       label="Notes (optional)"
       placeholder="Any issues or observations..."
-      :rows="2"
+      rows="2"
       flex="2"
     />
   </Section>
   
-  <!-- Validation messages -->
-  <Show when="$.validation.errors.length > 0">
+  {# Validation messages #}
+  {% if validation.errors | length > 0 %}
     <Alert variant="error" margin="md">
-      <ForEach items="$.validation.errors" as="error">
-        <Text bind:content="error.message" />
-      </ForEach>
+      {% for error in validation.errors %}
+        <Text>{{ error.message }}</Text>
+      {% endfor %}
     </Alert>
-  </Show>
+  {% endif %}
   
 </Layout>
+```
+
+**Layout Config (clinical-ner-v1.json):**
+
+```json
+{
+  "id": "clinical-ner-v1",
+  "name": "Clinical NER Layout",
+  "version": 1,
+  "config": {
+    "entity_types": [
+      {
+        "name": "Diagnosis",
+        "color": "#FF6B6B",
+        "hotkey": "d",
+        "description": "Medical diagnoses and conditions",
+        "examples": "diabetes, hypertension, pneumonia"
+      },
+      {
+        "name": "Medication",
+        "color": "#4ECDC4",
+        "hotkey": "m",
+        "description": "Drug names and dosages",
+        "examples": "metformin 500mg, lisinopril"
+      },
+      {
+        "name": "Procedure",
+        "color": "#45B7D1",
+        "hotkey": "p",
+        "description": "Medical procedures and tests",
+        "examples": "MRI, blood panel, appendectomy"
+      },
+      {
+        "name": "Anatomy",
+        "color": "#96CEB4",
+        "hotkey": "a",
+        "description": "Body parts and anatomical structures",
+        "examples": "left ventricle, femur, lungs"
+      }
+    ]
+  },
+  "schema": {
+    "input": {
+      "type": "object",
+      "properties": {
+        "document_id": { "type": "string" },
+        "document_text": { "type": "string" },
+        "priority": { "type": "string", "enum": ["low", "normal", "high"] }
+      },
+      "required": ["document_id", "document_text"]
+    },
+    "output": {
+      "type": "object",
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "start": { "type": "integer" },
+              "end": { "type": "integer" },
+              "type": { "type": "string" },
+              "text": { "type": "string" }
+            }
+          }
+        },
+        "confidence": { "type": "string", "enum": ["high", "medium", "low"] },
+        "document_quality": { "type": "string", "enum": ["good", "fair", "poor"] },
+        "notes": { "type": "string" }
+      },
+      "required": ["entities", "confidence"]
+    }
+  }
+}
 ```
 
 ### B.5 Quality Evaluator Configuration
