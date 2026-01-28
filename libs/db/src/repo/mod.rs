@@ -1,10 +1,13 @@
 //! Repository module
 //!
-//! Contains repository traits and error types.
-//! PostgreSQL implementations will be added in Phase 2 Plan 05.
+//! Contains repository traits, error types, and PostgreSQL implementations.
 
 pub mod errors;
+pub mod pg_stubs;
+pub mod pg_user;
 pub mod traits;
 
 pub use errors::*;
+pub use pg_stubs::*;
+pub use pg_user::*;
 pub use traits::*;
