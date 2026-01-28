@@ -60,7 +60,7 @@ Design principles and system goals.
 
 | Feature | Description |
 |---------|-------------|
-| **Workflow Types** | Predefined patterns: single, multi_vote, multi_adjudication, custom DAG |
+| **Workflow Types** | Predefined patterns: single, multi_adjudication, custom DAG |
 | **Workflow Steps** | Individual stages with type (annotation, review, adjudication, auto_process, conditional, sub_workflow) |
 | **Nested Workflows** | Workflows can reference other workflows as steps with clear entry/exit points |
 | **Step Completion Criteria** | When a task can proceed: annotation count, consensus, timeout handling |
@@ -292,7 +292,7 @@ All status enums must be consistent across: Domain Model (§2-§6), SQL Schema (
 
 | Enum | Canonical Values | Notes |
 |------|------------------|-------|
-| `workflow_type` | single, multi_vote, multi_adjudication, custom | Predefined workflow patterns |
+| `workflow_type` | single, multi_adjudication, custom | Predefined workflow patterns |
 | `completion_criteria_type` | annotation_count, review_decision, auto, manual | When step completes |
 | `consensus_method` | majority_vote, weighted_vote, unanimous | How to determine agreed value |
 | `resolution_strategy` | majority_vote, weighted_vote, adjudication, additional_annotators, escalate | How to handle disagreement |
@@ -653,7 +653,7 @@ QualityCriteria
 Workflow
 ├── workflow_id: UUID
 ├── name: string
-├── type: enum(single, multi_vote, multi_adjudication, custom)
+├── type: enum(single, multi_adjudication, custom)
 ├── entry_step_id: UUID                 # Explicit entry point (for nested workflows)
 ├── exit_step_ids: UUID[]               # Explicit exit points (for nested workflows)
 ├── steps: WorkflowStep[]
