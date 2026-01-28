@@ -89,7 +89,7 @@ Project
 
 | Enum | Values | SQL Type | Rust Type | TS Type |
 |------|--------|----------|-----------|---------|
-| `workflow_type` | single, multi_vote, multi_adjudication, custom | `workflow_type` | `WorkflowType` | `WorkflowType` |
+| `workflow_type` | single, multi_adjudication, custom | `workflow_type` | `WorkflowType` | `WorkflowType` |
 | `completion_criteria_type` | annotation_count, review_decision, auto, manual | `completion_criteria_type` | `CompletionCriteriaType` | `CompletionCriteriaType` |
 | `consensus_method` | majority_vote, weighted_vote, unanimous | `consensus_method` | `ConsensusMethod` | `ConsensusMethod` |
 | `resolution_strategy` | majority_vote, weighted_vote, adjudication, additional_annotators, escalate | `resolution_strategy` | `ResolutionStrategy` | `ResolutionStrategy` |
@@ -131,9 +131,8 @@ Project
 | Type | Description | Use Case |
 |------|-------------|----------|
 | `single` | One annotator per task | Simple labeling |
-| `multi_vote` | Multiple annotators, consensus needed | Quality-critical tasks |
-| `multi_adjudication` | Multiple + expert review | High-stakes annotation |
-| `custom` | Arbitrary DAG | Complex workflows |
+| `multi_adjudication` | Multiple annotators + adjudication on disagreement | Quality-critical tasks |
+| `custom` | Arbitrary DAG defined in YAML | Complex workflows |
 
 ### Step Types (§4.3)
 

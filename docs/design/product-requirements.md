@@ -1311,6 +1311,364 @@ RetryPolicy
 └── on_exhausted: enum(fail, escalate, skip)
 ```
 
+### 4.8 Workflow Configuration (YAML)
+
+Workflows are configured using YAML files that define the DAG structure, steps, transitions, and behaviors. This declarative approach allows non-developers to create and modify workflows while maintaining version control and validation.
+
+#### 4.8.1 Configuration File Structure
+
+```yaml
+# workflow.yaml - Complete workflow definition
+workflow:
+  id: "my-workflow-id"              # Unique identifier (UUID or slug)
+  name: "My Custom Workflow"        # Human-readable name
+  description: "Description of what this workflow does"
+  type: custom                      # single | multi_adjudication | custom
+  version: 1                        # Schema version for migrations
+  
+  # Entry and exit points (required for sub-workflow usage)
+  entry_step: "first-step-id"
+  exit_steps:
+    - "final-step-id"
+    - "alternative-exit-id"         # Multiple exits for branching
+  
+  # Step definitions
+  steps:
+    - id: "step-id"
+      # ... step configuration
+  
+  # Transition rules
+  transitions:
+    - from: "step-a"
+      to: "step-b"
+      # ... transition configuration
+  
+  # Workflow-level settings
+  settings:
+    allow_parallel_steps: false
+    max_retries: 3
+    default_timeout: "1h"
+    on_error: pause                 # pause | skip | escalate
+  
+  # Workflow-level hooks
+  hooks:
+    on_start:
+      - handler: "@platform/ml-context-init"
+        config:
+          preload_models: true
+    on_complete:
+      - handler: "@platform/export-trigger"
+```
+
+#### 4.8.2 Step Configuration
+
+```yaml
+steps:
+  # Annotation step - human creates labels
+  - id: "annotate"
+    name: "Initial Annotation"
+    type: annotation                # annotation | review | adjudication | auto_process | conditional | sub_workflow
+    layout_id: "ner-layout-v1"      # Reference to layout definition
+    
+    # Assignment configuration
+    assignment:
+      mode: auto                    # auto | manual | pool
+      load_balancing: quality_weighted  # round_robin | least_loaded | quality_weighted
+      max_concurrent_per_user: 5
+      required_skills:
+        - skill: "medical_coding"
+          min_proficiency: intermediate
+      required_roles:
+        - annotator
+      prevent_reassignment: true    # Don't assign user from previous steps
+    
+    # Completion criteria
+    completion:
+      type: annotation_count
+      count: 2                      # Number of annotations needed
+      unique_annotators: true       # Must be different users
+      min_required: 2               # Minimum to proceed
+      timeout: "2h"
+      timeout_action: escalate      # proceed | retry | escalate
+    
+    # Consensus handling (for multi-annotation)
+    consensus:
+      metric: "agreement:krippendorff_alpha"
+      threshold: 0.85
+      on_agreement:
+        action: complete
+        method: majority_vote       # majority_vote | weighted_vote | unanimous
+      on_disagreement:
+        strategy: adjudication      # majority_vote | weighted_vote | adjudication | additional_annotators | escalate
+        fallback: escalate
+    
+    # Goal contributions
+    goal_contributions:
+      - goal_id: "volume"
+        type: count
+        metric_source: "submitted_annotations"
+        aggregation: sum
+      - goal_id: "quality"
+        type: quality_metric
+        metric_source: "inter_annotator_agreement"
+        aggregation: average
+    
+    # Step-level hooks
+    hooks:
+      pre_process:
+        - id: "ai-prefill"
+          handler: "@platform/ai-prefill"
+          async: false
+          config:
+            model: "gpt-4"
+            fields: ["diagnosis_codes"]
+            confidence_threshold: 0.85
+      post_process:
+        - id: "quality-check"
+          handler: "@platform/auto-quality"
+          async: true
+
+  # Review step - reviewer approves/rejects
+  - id: "review"
+    name: "Quality Review"
+    type: review
+    layout_id: "review-layout-v1"
+    assignment:
+      mode: auto
+      required_roles:
+        - reviewer
+      prevent_reassignment: true
+    completion:
+      type: review_decision         # Completes when reviewer decides
+
+  # Auto-process step - system executes automatically
+  - id: "agreement-check"
+    name: "Calculate Agreement"
+    type: auto_process
+    handler: "@platform/agreement-calculator"
+    config:
+      metric: "krippendorff_alpha"
+      threshold: 0.85
+    completion:
+      type: auto                    # Completes when handler finishes
+
+  # Conditional step - routes based on data
+  - id: "quality-gate"
+    name: "Quality Gate"
+    type: conditional
+    condition:
+      expression: "$.context.agreement_score >= 0.85"
+    # Transitions define where to go based on condition result
+
+  # Sub-workflow step - delegates to another workflow
+  - id: "entity-extraction"
+    name: "Extract Entities"
+    type: sub_workflow
+    sub_workflow_id: "ner-linking-workflow"
+    input_mapping:
+      text: "$.output.document_text"
+    output_mapping:
+      entities: "$.sub_workflow_output.entities"
+    propagate_assignment: true      # Same user continues in child
+    timeout: "30m"
+```
+
+#### 4.8.3 Transition Configuration
+
+Transitions define how tasks flow between steps. They form the edges of the workflow DAG.
+
+```yaml
+transitions:
+  # Simple transition - always fires when source completes
+  - from: "annotate"
+    to: "review"
+    condition:
+      type: on_complete             # always | on_complete | on_agreement | on_disagreement | expression
+
+  # Conditional transition - based on agreement
+  - from: "agreement-check"
+    to: "complete"
+    condition:
+      type: on_agreement
+      threshold: 0.85
+    priority: 1                     # Higher priority = evaluated first
+
+  - from: "agreement-check"
+    to: "adjudication"
+    condition:
+      type: on_disagreement
+    priority: 2
+
+  # Expression-based transition
+  - from: "review"
+    to: "complete"
+    condition:
+      type: expression
+      expression: "$.annotation.status == 'approved'"
+
+  - from: "review"
+    to: "annotate"                  # Loop back for revision
+    condition:
+      type: expression
+      expression: "$.annotation.status == 'rejected'"
+
+  # Parallel split - multiple transitions from one step
+  - from: "intake"
+    to: "ner-annotation"
+    condition:
+      type: always
+  - from: "intake"
+    to: "classification"
+    condition:
+      type: always
+    # Both fire, creating parallel execution
+
+  # Parallel join - step waits for multiple inputs
+  - from: "ner-annotation"
+    to: "merge-results"
+    condition:
+      type: on_complete
+  - from: "classification"
+    to: "merge-results"
+    condition:
+      type: on_complete
+    # merge-results has join_mode: all (wait for both)
+```
+
+#### 4.8.4 Parallel Execution
+
+For workflows requiring parallel step execution:
+
+```yaml
+workflow:
+  id: "parallel-annotation"
+  name: "Parallel NER + Classification"
+  type: custom
+  entry_step: "intake"
+  exit_steps: ["complete"]
+  
+  settings:
+    allow_parallel_steps: true      # Enable parallel execution
+  
+  steps:
+    - id: "intake"
+      type: auto_process
+      handler: "@platform/task-splitter"
+    
+    - id: "ner-annotation"
+      type: annotation
+      layout_id: "ner-layout"
+      parallel_group: "annotation"  # Group for parallel tracking
+    
+    - id: "classification"
+      type: annotation
+      layout_id: "classification-layout"
+      parallel_group: "annotation"
+    
+    - id: "merge-results"
+      type: auto_process
+      handler: "@platform/result-merger"
+      join_mode: all                # all | any | n_of_m
+      join_timeout: "1h"            # Timeout waiting for parallel steps
+    
+    - id: "complete"
+      type: auto_process
+      handler: "@platform/finalize"
+  
+  transitions:
+    # Fork: intake splits to parallel steps
+    - from: "intake"
+      to: "ner-annotation"
+      condition: { type: always }
+    - from: "intake"
+      to: "classification"
+      condition: { type: always }
+    
+    # Join: parallel steps merge
+    - from: "ner-annotation"
+      to: "merge-results"
+      condition: { type: on_complete }
+    - from: "classification"
+      to: "merge-results"
+      condition: { type: on_complete }
+    
+    - from: "merge-results"
+      to: "complete"
+      condition: { type: on_complete }
+```
+
+#### 4.8.5 Workflow Validation
+
+Workflow YAML files are validated against a JSON Schema before deployment:
+
+```yaml
+# Validation rules enforced:
+# 1. All referenced step IDs must exist
+# 2. entry_step must reference a valid step
+# 3. exit_steps must reference valid steps
+# 4. No orphan steps (unreachable from entry)
+# 5. No cycles without explicit loop markers
+# 6. All layout_ids must reference existing layouts
+# 7. All handler references must be registered
+# 8. Transition conditions must be valid expressions
+# 9. Required fields present for each step type
+# 10. Parallel joins must have corresponding forks
+```
+
+**CLI Validation:**
+
+```bash
+# Validate workflow configuration
+$ glyph workflow validate workflow.yaml
+✓ Schema validation passed
+✓ Step references valid
+✓ Transition graph valid
+✓ No unreachable steps
+✓ Layout references valid
+✓ Handler references valid
+
+# Visualize workflow DAG
+$ glyph workflow visualize workflow.yaml --output workflow.png
+
+# Dry-run workflow with sample data
+$ glyph workflow dry-run workflow.yaml --input sample-task.json
+```
+
+#### 4.8.6 Predefined Workflow Templates
+
+The platform provides templates for common patterns:
+
+```yaml
+# Use a predefined template
+workflow:
+  template: multi_adjudication      # Extends predefined template
+  id: "my-medical-coding"
+  name: "Medical Coding with Review"
+  
+  # Override template defaults
+  overrides:
+    steps:
+      annotate:
+        completion:
+          count: 3                  # Override: 3 annotators instead of 2
+        assignment:
+          required_skills:
+            - skill: "icd10_coding"
+              min_proficiency: expert
+    
+    consensus:
+      threshold: 0.90               # Higher agreement threshold
+```
+
+**Available templates:**
+
+| Template | Description | Steps |
+|----------|-------------|-------|
+| `single` | One annotator, direct complete | annotate → complete |
+| `multi_adjudication` | N annotators → agreement check → adjudication if needed | annotate(N) → check → adjudicate? → complete |
+| `review_required` | Annotation with mandatory review | annotate → review → complete |
+| `iterative_refinement` | Review loop until approved | annotate ↔ review → complete |
+
 ---
 
 
@@ -3529,7 +3887,7 @@ CREATE TYPE goal_type AS ENUM ('volume', 'quality', 'deadline', 'duration', 'com
 CREATE TYPE quality_entity_type AS ENUM ('task', 'annotation', 'user', 'project');
 
 -- Workflow Configuration Enums (§4 Workflow Engine)
-CREATE TYPE workflow_type AS ENUM ('single', 'multi_vote', 'multi_adjudication', 'custom');
+CREATE TYPE workflow_type AS ENUM ('single', 'multi_adjudication', 'custom');
 CREATE TYPE completion_criteria_type AS ENUM ('annotation_count', 'review_decision', 'auto', 'manual');
 CREATE TYPE consensus_method AS ENUM ('majority_vote', 'weighted_vote', 'unanimous');
 CREATE TYPE resolution_strategy AS ENUM ('majority_vote', 'weighted_vote', 'adjudication', 'additional_annotators', 'escalate');
@@ -6374,7 +6732,6 @@ pub enum StepType {
 #[serde(rename_all = "snake_case")]
 pub enum WorkflowType {
     Single,
-    MultiVote,
     MultiAdjudication,
     Custom,
 }
@@ -7059,7 +7416,7 @@ export type ProjectStatus = 'draft' | 'active' | 'paused' | 'completed' | 'archi
 export type GoalType = 'volume' | 'quality' | 'deadline' | 'duration' | 'composite' | 'manual';
 
 // Workflow Configuration Enums (§4 Workflow Engine)
-export type WorkflowType = 'single' | 'multi_vote' | 'multi_adjudication' | 'custom';
+export type WorkflowType = 'single' | 'multi_adjudication' | 'custom';
 export type CompletionCriteriaType = 'annotation_count' | 'review_decision' | 'auto' | 'manual';
 export type ConsensusMethod = 'majority_vote' | 'weighted_vote' | 'unanimous';
 export type ResolutionStrategy = 'majority_vote' | 'weighted_vote' | 'adjudication' | 'additional_annotators' | 'escalate';
