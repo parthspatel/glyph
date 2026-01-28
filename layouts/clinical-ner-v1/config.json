@@ -1,0 +1,56 @@
+{
+  "id": "clinical-ner-v1",
+  "name": "Clinical NER Annotation",
+  "version": "1.0.0",
+  "description": "Named entity recognition layout for clinical text annotation",
+  "author": "Glyph Team",
+  "settings": {
+    "showSuggestions": true,
+    "allowOverlappingEntities": false,
+    "requireAtLeastOneEntity": false
+  },
+  "entityTypes": [
+    {
+      "id": "medication",
+      "label": "Medication",
+      "color": "#3b82f6",
+      "shortcut": "1",
+      "description": "Drug names, dosages, and formulations"
+    },
+    {
+      "id": "condition",
+      "label": "Condition",
+      "color": "#ef4444",
+      "shortcut": "2",
+      "description": "Diseases, symptoms, and diagnoses"
+    },
+    {
+      "id": "procedure",
+      "label": "Procedure",
+      "color": "#22c55e",
+      "shortcut": "3",
+      "description": "Medical procedures and treatments"
+    },
+    {
+      "id": "anatomy",
+      "label": "Anatomy",
+      "color": "#f59e0b",
+      "shortcut": "4",
+      "description": "Body parts and anatomical structures"
+    },
+    {
+      "id": "measurement",
+      "label": "Measurement",
+      "color": "#8b5cf6",
+      "shortcut": "5",
+      "description": "Lab values, vital signs, and measurements"
+    }
+  ],
+  "guidelines": [
+    "Select the entire entity span including modifiers",
+    "Do not include punctuation at the end of entities",
+    "Mark dosages as part of the medication entity",
+    "Use the most specific entity type available",
+    "When in doubt, refer to the annotation guidelines document"
+  ]
+}

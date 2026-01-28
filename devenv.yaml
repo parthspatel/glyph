@@ -1,6 +1,11 @@
 inputs:
   nixpkgs:
     url: github:cachix/devenv-nixpkgs/rolling
+  nixpkgs-python:
+    url: github:cachix/nixpkgs-python
+    inputs:
+      nixpkgs:
+        follows: nixpkgs
   rust-overlay:
     url: github:oxalica/rust-overlay
     inputs:
@@ -8,5 +13,5 @@ inputs:
         follows: nixpkgs
 secretspec:
   enable: true
-  provider: keyring # keyring, dotenv, env, 1password, lastpass
-  profile: default # profile from secretspec.toml
+  profile: default
+  provider: keyring

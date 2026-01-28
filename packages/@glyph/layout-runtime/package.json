@@ -1,0 +1,27 @@
+{
+  "name": "@glyph/layout-runtime",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@glyph/components": "workspace:*",
+    "nunjucks": "^3.2.4",
+    "react": "^18.3.0"
+  },
+  "devDependencies": {
+    "@types/nunjucks": "^3.2.6",
+    "@types/react": "^18.3.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  }
+}

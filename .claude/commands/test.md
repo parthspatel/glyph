@@ -1,1 +1,1 @@
-/nix/store/3y8whvkzjvpidss0pyljslnrfpna40c2-claude-commands-test.md
+/nix/store/1sbvnm5084hdp4l1v35z58d67pv7z83v-claude-commands-test.md

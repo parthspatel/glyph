@@ -1,0 +1,30 @@
+{# Base template for annotation layouts #}
+{% macro renderTask(input, output, config) %}
+<div class="annotation-layout">
+  <header class="annotation-layout__header">
+    <h1>{{ config.title | default("Annotation Task") }}</h1>
+    {% if config.description %}
+    <p class="annotation-layout__description">{{ config.description }}</p>
+    {% endif %}
+  </header>
+
+  <main class="annotation-layout__content">
+    {% block content %}
+    {# Override this block in child templates #}
+    {% endblock %}
+  </main>
+
+  <footer class="annotation-layout__footer">
+    {% block actions %}
+    <div class="annotation-layout__actions">
+      <button type="button" class="btn btn-secondary" data-action="save-draft">
+        Save Draft
+      </button>
+      <button type="submit" class="btn btn-primary" data-action="submit">
+        Submit
+      </button>
+    </div>
+    {% endblock %}
+  </footer>
+</div>
+{% endmacro %}

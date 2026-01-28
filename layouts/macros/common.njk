@@ -1,0 +1,48 @@
+{# Common macros for annotation layouts #}
+
+{# Render a section with optional title and collapsible behavior #}
+{% macro section(title, collapsible=false, collapsed=false) %}
+<section class="layout-section {% if collapsible %}layout-section--collapsible{% endif %} {% if collapsed %}layout-section--collapsed{% endif %}">
+  {% if title %}
+  <header class="layout-section__header">
+    <h3 class="layout-section__title">{{ title }}</h3>
+    {% if collapsible %}
+    <button type="button" class="layout-section__toggle" aria-expanded="{{ not collapsed }}">
+      {% if collapsed %}▶{% else %}▼{% endif %}
+    </button>
+    {% endif %}
+  </header>
+  {% endif %}
+  <div class="layout-section__content">
+    {{ caller() }}
+  </div>
+</section>
+{% endmacro %}
+
+{# Render a grid layout #}
+{% macro grid(columns=2, gap="1rem") %}
+<div class="layout-grid" style="display: grid; grid-template-columns: repeat({{ columns }}, 1fr); gap: {{ gap }};">
+  {{ caller() }}
+</div>
+{% endmacro %}
+
+{# Render an info box #}
+{% macro infoBox(type="info") %}
+<div class="info-box info-box--{{ type }}">
+  {{ caller() }}
+</div>
+{% endmacro %}
+
+{# Render a tooltip #}
+{% macro tooltip(text) %}
+<span class="tooltip" data-tooltip="{{ text }}">
+  {{ caller() }}
+</span>
+{% endmacro %}
+
+{# Conditional show #}
+{% macro showIf(condition) %}
+{% if condition %}
+{{ caller() }}
+{% endif %}
+{% endmacro %}

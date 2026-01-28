@@ -1,0 +1,23 @@
+{
+  "name": "glyph",
+  "private": true,
+  "version": "0.1.0",
+  "description": "AI Data Annotation Platform",
+  "scripts": {
+    "dev": "pnpm --filter @glyph/web dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "typegen": "typeshare --lang typescript --output-file packages/@glyph/types/src/generated.ts crates/",
+    "clean": "pnpm -r clean"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

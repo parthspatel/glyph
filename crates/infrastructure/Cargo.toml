@@ -1,0 +1,28 @@
+[package]
+name = "glyph-infrastructure"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+name = "glyph_infrastructure"
+path = "src/lib.rs"
+
+[dependencies]
+glyph-domain = { path = "../domain" }
+
+tokio.workspace = true
+async-trait.workspace = true
+sqlx.workspace = true
+deadpool-redis.workspace = true
+async-nats.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

@@ -1,1 +1,1 @@
-/nix/store/7qb0vgj9dq3vxal8c41k3y0lzvl2sxcj-claude-commands-build.md
+/nix/store/fg4gywi9ggvfwyj1idv7rrs2wkhf78wr-claude-commands-build.md

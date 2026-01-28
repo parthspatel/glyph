@@ -1,0 +1,66 @@
+{# Clinical NER Annotation Layout v1 #}
+{% extends "base/annotation-base.njk" %}
+{% import "partials/entity-legend.njk" as legend %}
+{% import "macros/common.njk" as common %}
+
+{% block content %}
+<div class="clinical-ner-layout">
+  {# Entity type legend sidebar #}
+  <aside class="clinical-ner-layout__sidebar">
+    {{ legend.entityLegend(config.entityTypes) }}
+
+    {% call common.section("Guidelines", collapsible=true, collapsed=true) %}
+    <ul class="guidelines-list">
+      {% for guideline in config.guidelines %}
+      <li>{{ guideline }}</li>
+      {% endfor %}
+    </ul>
+    {% endcall %}
+  </aside>
+
+  {# Main annotation area #}
+  <div class="clinical-ner-layout__main">
+    {% call common.section("Document") %}
+    <NERTagger
+      text="{{ input.text }}"
+      entityTypes="{{ config.entityTypes | dump }}"
+      value="{{ output.entities | default([]) | dump }}"
+      onChange="$.output.entities"
+      suggestions="{{ context.ai_suggestions | default([]) | dump }}"
+    />
+    {% endcall %}
+
+    {# AI Suggestions panel #}
+    {% if context.ai_suggestions and context.ai_suggestions.length > 0 %}
+    {% call common.section("AI Suggestions") %}
+    <div class="suggestions-panel">
+      <p class="suggestions-panel__hint">
+        Click on a suggestion to accept it, or annotate manually.
+      </p>
+      <div class="suggestions-panel__list">
+        {% for suggestion in context.ai_suggestions %}
+        <button
+          class="suggestion-chip"
+          data-suggestion-id="{{ suggestion.id }}"
+          style="--entity-color: {{ config.entityTypes | selectattr('id', 'equalto', suggestion.type) | first | attr('color') }}"
+        >
+          {{ suggestion.text }} ({{ suggestion.type }})
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    {% endcall %}
+    {% endif %}
+
+    {# Notes field #}
+    {% call common.section("Notes", collapsible=true) %}
+    <TextArea
+      value="{{ output.notes | default('') }}"
+      onChange="$.output.notes"
+      placeholder="Add any notes about this annotation..."
+      rows="3"
+    />
+    {% endcall %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,20 @@
+{# Entity type legend partial #}
+{% macro entityLegend(entityTypes) %}
+<div class="entity-legend">
+  <h4 class="entity-legend__title">Entity Types</h4>
+  <ul class="entity-legend__list">
+    {% for entity in entityTypes %}
+    <li class="entity-legend__item" style="--entity-color: {{ entity.color }}">
+      <span class="entity-legend__color" style="background-color: {{ entity.color }}"></span>
+      <span class="entity-legend__label">{{ entity.label }}</span>
+      {% if entity.shortcut %}
+      <kbd class="entity-legend__shortcut">{{ entity.shortcut }}</kbd>
+      {% endif %}
+      {% if entity.description %}
+      <span class="entity-legend__description">{{ entity.description }}</span>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endmacro %}

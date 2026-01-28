@@ -1,10 +1,38 @@
 [package]
-name = "glpyh-api"
-version = "0.1.0"
-edition = "2024"
-authors = ["Parth Patel <parthspatel.nj@gmail.com>"]
-license = ""
+name = "glyph-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
 
 [lib]
-name = "glphy_api"
+name = "glyph_api"
 path = "src/lib.rs"
+
+[[bin]]
+name = "glyph-server"
+path = "src/main.rs"
+
+[dependencies]
+glyph-domain = { path = "../domain" }
+glyph-infrastructure = { path = "../infrastructure" }
+glyph-services = { path = "../services" }
+glyph-plugins = { path = "../plugins" }
+
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+config.workspace = true
+dotenvy.workspace = true
+
+[lints]
+workspace = true

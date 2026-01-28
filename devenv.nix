@@ -7,34 +7,102 @@
 }:
 
 {
-
   env = {
     NPM_CONFIG_CACHE = ".devenv/npm-cache";
     NPM_CONFIG_PREFIX = ".devenv/npm-global";
+    DATABASE_URL = "postgres://glyph:glyph@localhost:5432/glyph";
+    REDIS_URL = "redis://localhost:6379";
   };
 
   packages = [
     pkgs.git
     pkgs.jq
+    pkgs.sqlx-cli
+    pkgs.pnpm
   ];
 
+  # JavaScript/TypeScript with pnpm
   languages.javascript = {
     enable = true;
-    package = pkgs.nodejs;
+    package = pkgs.nodejs_22;
+    pnpm = {
+      enable = true;
+      install.enable = true;
+    };
   };
 
-  scripts.gsd.exec = ''
-    npx get-shit-done-cc@latest "$@"
-  '';
-
-  # https://devenv.sh/languages/
+  # Rust
   languages.rust = {
     enable = true;
     toolchainFile = ./rust-toolchain.toml;
   };
 
-  # https://devenv.sh/git-hooks/
-  # git-hooks.hooks.shellcheck.enable = true;
+  # Python for ML services
+  # languages.python = {
+  #   enable = true;
+  #   version = "3.12";
+  #   uv = {
+  #     enable = true;
+  #     sync.enable = true;
+  #   };
+  # };
+
+  # PostgreSQL
+  services.postgres = {
+    enable = true;
+    package = pkgs.postgresql_16;
+    initialDatabases = [
+      { name = "glyph"; }
+    ];
+    initialScript = ''
+      CREATE USER glyph WITH PASSWORD 'glyph' SUPERUSER;
+      GRANT ALL PRIVILEGES ON DATABASE glyph TO glyph;
+    '';
+    listen_addresses = "127.0.0.1";
+    port = 5432;
+  };
+
+  # Redis
+  services.redis = {
+    enable = true;
+    port = 6379;
+  };
+
+  # Custom scripts
+  scripts = {
+    gsd.exec = ''
+      npx get-shit-done-cc@latest "$@"
+    '';
+
+    db-migrate.exec = ''
+      sqlx migrate run --source migrations/
+    '';
+
+    db-reset.exec = ''
+      sqlx database drop -y || true
+      sqlx database create
+      sqlx migrate run --source migrations/
+    '';
+
+    dev-api.exec = ''
+      cargo run --package glyph-api
+    '';
+
+    dev-web.exec = ''
+      pnpm --filter @glyph/web dev
+    '';
+
+    dev.exec = ''
+      echo "Starting development servers..."
+      echo "API: http://localhost:3000"
+      echo "Web: http://localhost:5173"
+      # Run both in parallel
+      (cargo run --package glyph-api &)
+      pnpm --filter @glyph/web dev
+    '';
+  };
+
+  # Git hooks
   difftastic.enable = true;
   git-hooks.hooks = {
     nixfmt.enable = true;
@@ -46,8 +114,7 @@
     commitizen.enable = true;
   };
 
-  # devcontainer.enable = true;
-
+  # Claude Code integration
   claude.code = {
     enable = true;
     commands = {
@@ -56,6 +123,7 @@
 
         ```bash
         cargo test
+        pnpm test
         ```
       '';
 
@@ -64,18 +132,25 @@
 
         ```bash
         cargo build --release
+        pnpm build
+        ```
+      '';
+
+      migrate = ''
+        Run database migrations
+
+        ```bash
+        sqlx migrate run --source migrations/
         ```
       '';
     };
     hooks = {
-      # Protect sensitive files (PreToolUse hook)
       protect-secrets = {
         enable = true;
         name = "Protect sensitive files";
         hookType = "PreToolUse";
         matcher = "^(Edit|MultiEdit|Write)$";
         command = ''
-          # Read the JSON input from stdin
           json=$(cat)
           file_path=$(echo "$json" | jq -r '.file_path // empty')
 
@@ -99,50 +174,11 @@
 
           if [[ "$file_path" =~ \.rs$ ]]; then
             cargo test
+          elif [[ "$file_path" =~ \.(ts|tsx)$ ]]; then
+            pnpm test
           fi
         '';
       };
-
-      # # Type checking (PostToolUse hook)
-      # typecheck = {
-      #   enable = true;
-      #   name = "Run type checking";
-      #   hookType = "PostToolUse";
-      #   matcher = "^(Edit|MultiEdit|Write)$";
-      #   command = ''
-      #     # Read the JSON input from stdin
-      #     json=$(cat)
-      #     file_path=$(echo "$json" | jq -r '.file_path // empty')
-
-      #     if [[ "$file_path" =~ \.ts$ ]]; then
-      #       npm run typecheck
-      #     fi
-      #   '';
-      # };
-
-      # # Log notifications (Notification hook)
-      # log-notifications = {
-      #   enable = true;
-      #   name = "Log Claude notifications";
-      #   hookType = "Notification";
-      #   command = ''echo "Claude notification received" >> claude.log'';
-      # };
-
-      # # Track completion (Stop hook)
-      # track-completion = {
-      #   enable = true;
-      #   name = "Track when Claude finishes";
-      #   hookType = "Stop";
-      #   command = ''echo "Claude finished at $(date)" >> claude-sessions.log'';
-      # };
-
-      # # Subagent monitoring (SubagentStop hook)
-      # subagent-complete = {
-      #   enable = true;
-      #   name = "Log subagent completion";
-      #   hookType = "SubagentStop";
-      #   command = ''echo "Subagent task completed" >> subagent.log'';
-      # };
     };
   };
 }
