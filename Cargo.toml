@@ -68,6 +68,11 @@ http = "1.2"
 
 # Error handling (RFC 7807)
 problem_details = { version = "0.9", features = ["axum"] }
+
+# OpenAPI documentation
+utoipa = { version = "5", features = ["axum_extras", "uuid", "chrono"] }
+utoipa-axum = "0.2"
+utoipa-swagger-ui = { version = "9", features = ["axum"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # Plugin runtime

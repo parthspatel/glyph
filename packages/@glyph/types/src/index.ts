@@ -12,104 +12,115 @@
 // Core Status Enums (matching Rust enums)
 // =============================================================================
 
-export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type UserStatus = "active" | "inactive" | "suspended" | "deleted";
 
 export type TaskStatus =
-  | 'pending'
-  | 'assigned'
-  | 'in_progress'
-  | 'review'
-  | 'adjudication'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+  | "pending"
+  | "assigned"
+  | "in_progress"
+  | "review"
+  | "adjudication"
+  | "completed"
+  | "failed"
+  | "cancelled"
+  | "deleted";
 
 export type AnnotationStatus =
-  | 'draft'
-  | 'submitted'
-  | 'approved'
-  | 'rejected'
-  | 'superseded';
+  | "draft"
+  | "submitted"
+  | "approved"
+  | "rejected"
+  | "superseded"
+  | "deleted";
 
 export type AssignmentStatus =
-  | 'assigned'
-  | 'accepted'
-  | 'in_progress'
-  | 'submitted'
-  | 'expired'
-  | 'reassigned';
+  | "assigned"
+  | "accepted"
+  | "in_progress"
+  | "submitted"
+  | "expired"
+  | "reassigned";
 
 export type StepType =
-  | 'annotation'
-  | 'review'
-  | 'adjudication'
-  | 'auto_process'
-  | 'conditional'
-  | 'sub_workflow';
+  | "annotation"
+  | "review"
+  | "adjudication"
+  | "auto_process"
+  | "conditional"
+  | "sub_workflow";
 
-export type StepStatus = 'pending' | 'active' | 'completed' | 'skipped';
+export type StepStatus = "pending" | "active" | "completed" | "skipped";
 
-export type ActorType = 'user' | 'system' | 'api';
+export type ActorType = "user" | "system" | "api";
 
 export type ProjectStatus =
-  | 'draft'
-  | 'active'
-  | 'paused'
-  | 'completed'
-  | 'archived';
+  | "draft"
+  | "active"
+  | "paused"
+  | "completed"
+  | "archived"
+  | "deleted";
+
+export type TeamStatus = "active" | "inactive" | "deleted";
+
+export type TeamRole = "leader" | "manager" | "member";
 
 export type GoalType =
-  | 'volume'
-  | 'quality'
-  | 'deadline'
-  | 'duration'
-  | 'composite'
-  | 'manual';
+  | "volume"
+  | "quality"
+  | "deadline"
+  | "duration"
+  | "composite"
+  | "manual";
 
-export type QualityEntityType = 'task' | 'annotation' | 'user' | 'project';
+export type QualityEntityType = "task" | "annotation" | "user" | "project";
 
 // =============================================================================
 // Workflow Configuration Enums
 // =============================================================================
 
-export type WorkflowType = 'single' | 'multi_adjudication' | 'custom';
+export type WorkflowType = "single" | "multi_adjudication" | "custom";
 
 export type CompletionCriteriaType =
-  | 'annotation_count'
-  | 'review_decision'
-  | 'auto'
-  | 'manual';
+  | "annotation_count"
+  | "review_decision"
+  | "auto"
+  | "manual";
 
-export type ConsensusMethod = 'majority_vote' | 'weighted_vote' | 'unanimous';
+export type ConsensusMethod = "majority_vote" | "weighted_vote" | "unanimous";
 
 export type ResolutionStrategy =
-  | 'majority_vote'
-  | 'weighted_vote'
-  | 'adjudication'
-  | 'additional_annotators'
-  | 'escalate';
+  | "majority_vote"
+  | "weighted_vote"
+  | "adjudication"
+  | "additional_annotators"
+  | "escalate";
 
-export type AssignmentMode = 'auto' | 'manual' | 'pool';
+export type AssignmentMode = "auto" | "manual" | "pool";
 
 export type LoadBalancingStrategy =
-  | 'round_robin'
-  | 'least_loaded'
-  | 'quality_weighted';
+  | "round_robin"
+  | "least_loaded"
+  | "quality_weighted";
 
-export type ContributionType = 'count' | 'quality_metric' | 'progress';
+export type ContributionType = "count" | "quality_metric" | "progress";
 
-export type AggregationType = 'sum' | 'latest' | 'average' | 'min' | 'max';
+export type AggregationType = "sum" | "latest" | "average" | "min" | "max";
 
 export type TransitionConditionType =
-  | 'always'
-  | 'on_complete'
-  | 'on_agreement'
-  | 'on_disagreement'
-  | 'expression';
+  | "always"
+  | "on_complete"
+  | "on_agreement"
+  | "on_disagreement"
+  | "expression";
 
-export type TimeoutAction = 'proceed' | 'retry' | 'escalate';
+export type TimeoutAction = "proceed" | "retry" | "escalate";
 
-export type ProficiencyLevel = 'novice' | 'intermediate' | 'advanced' | 'expert';
+export type ProficiencyLevel =
+  | "novice"
+  | "intermediate"
+  | "advanced"
+  | "expert";
 
 // =============================================================================
 // Core Interfaces
@@ -296,3 +307,75 @@ export interface WorkflowHooks {
   on_start: string[];
   on_complete: string[];
 }
+
+// =============================================================================
+// Team Types (new in Phase 2)
+// =============================================================================
+
+export interface Team {
+  team_id: string;
+  name: string;
+  description?: string;
+  leader_id: string;
+  status: TeamStatus;
+  capacity?: number;
+  specializations: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TeamMembership {
+  team_id: string;
+  user_id: string;
+  role: TeamRole;
+  allocation_percentage?: number;
+  joined_at: string;
+}
+
+// =============================================================================
+// Pagination Types (new in Phase 2)
+// =============================================================================
+
+export type SortOrder = "asc" | "desc";
+
+export interface Pagination {
+  limit: number;
+  offset: number;
+  sort_by?: string;
+  sort_order: SortOrder;
+}
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+// =============================================================================
+// ID Types (new in Phase 2 - prefixed format)
+// =============================================================================
+
+/** User ID in format: user_{uuid} */
+export type UserId = string;
+
+/** Team ID in format: team_{uuid} */
+export type TeamId = string;
+
+/** Project ID in format: proj_{uuid} */
+export type ProjectId = string;
+
+/** Task ID in format: task_{uuid} */
+export type TaskId = string;
+
+/** Annotation ID in format: annot_{uuid} */
+export type AnnotationId = string;
+
+/** Workflow ID in format: wf_{uuid} */
+export type WorkflowId = string;
+
+/** Assignment ID in format: asgn_{uuid} */
+export type AssignmentId = string;
+
+/** Quality Score ID in format: score_{uuid} */
+export type QualityScoreId = string;
