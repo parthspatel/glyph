@@ -196,3 +196,51 @@ pub enum CreateWorkflowError {
     #[error("database error")]
     Database(#[source] sqlx::Error),
 }
+
+// =============================================================================
+// Skill Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateSkillTypeError {
+    #[error("skill type already exists: {0}")]
+    AlreadyExists(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindSkillTypeError {
+    #[error("skill type not found: {0}")]
+    NotFound(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateSkillTypeError {
+    #[error("skill type not found: {0}")]
+    NotFound(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum CertifySkillError {
+    #[error("skill type not found: {0}")]
+    SkillTypeNotFound(String),
+    #[error("user not found: {0}")]
+    UserNotFound(UserId),
+    #[error("invalid proficiency level")]
+    InvalidProficiency,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum RevokeSkillError {
+    #[error("certification not found")]
+    NotFound,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}

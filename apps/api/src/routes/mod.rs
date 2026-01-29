@@ -4,6 +4,7 @@ mod annotations;
 pub mod auth;
 mod health;
 mod projects;
+mod skills;
 mod tasks;
 mod users;
 mod workflows;
@@ -23,6 +24,8 @@ pub fn api_routes() -> Router {
 fn api_v1_routes() -> Router {
     Router::new()
         .nest("/users", users::routes())
+        .nest("/users/{user_id}/skills", skills::user_skill_routes())
+        .nest("/skills/types", skills::skill_type_routes())
         .nest("/tasks", tasks::routes())
         .nest("/annotations", annotations::routes())
         .nest("/projects", projects::routes())

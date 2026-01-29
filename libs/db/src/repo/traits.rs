@@ -4,6 +4,8 @@
 //! Implementations are provided for PostgreSQL in separate modules.
 
 use async_trait::async_trait;
+use uuid::Uuid;
+
 use glyph_domain::{
     Annotation, AnnotationStatus, Project, ProjectStatus, Task, TaskStatus, Team, TeamMembership,
     TeamRole, TeamStatus, User, UserStatus, Workflow,
@@ -269,4 +271,105 @@ pub trait WorkflowRepository: Send + Sync {
 
     /// List workflows with pagination
     async fn list(&self, pagination: Pagination) -> Result<Page<Workflow>, sqlx::Error>;
+}
+
+// =============================================================================
+// Skill Repository Types and Trait
+// =============================================================================
+
+/// Input for creating a new skill type
+#[derive(Debug, Clone)]
+pub struct NewSkillType {
+    pub skill_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub expiration_months: Option<i32>,
+    pub grace_period_days: i32,
+    pub requires_proficiency: bool,
+    pub proficiency_levels: Option<Vec<String>>,
+}
+
+/// Input for updating a skill type
+#[derive(Debug, Clone, Default)]
+pub struct SkillTypeUpdate {
+    pub name: Option<String>,
+    pub description: Option<String>,
+    pub expiration_months: Option<Option<i32>>,
+    pub grace_period_days: Option<i32>,
+    pub requires_proficiency: Option<bool>,
+    pub proficiency_levels: Option<Option<Vec<String>>>,
+}
+
+/// Input for certifying a user skill
+#[derive(Debug, Clone)]
+pub struct CertifyUserSkill {
+    pub user_id: UserId,
+    pub skill_id: String,
+    pub proficiency_level: Option<String>,
+    pub certified_by: UserId,
+    pub notes: Option<String>,
+}
+
+/// User skill with computed status from database view
+#[derive(Debug, Clone)]
+pub struct UserSkillWithStatus {
+    pub certification_id: Uuid,
+    pub user_id: UserId,
+    pub skill_id: String,
+    pub skill_name: String,
+    pub proficiency_level: Option<String>,
+    pub certified_by: Option<UserId>,
+    pub certified_at: chrono::DateTime<chrono::Utc>,
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub notes: Option<String>,
+    pub grace_period_days: i32,
+    pub status: String,
+}
+
+/// Repository for skill operations
+#[async_trait]
+pub trait SkillRepository: Send + Sync {
+    /// Create a new skill type
+    async fn create_skill_type(
+        &self,
+        skill_type: &NewSkillType,
+    ) -> Result<glyph_domain::SkillType, CreateSkillTypeError>;
+
+    /// Find a skill type by ID
+    async fn find_skill_type(
+        &self,
+        skill_id: &str,
+    ) -> Result<Option<glyph_domain::SkillType>, FindSkillTypeError>;
+
+    /// List all skill types
+    async fn list_skill_types(&self) -> Result<Vec<glyph_domain::SkillType>, sqlx::Error>;
+
+    /// Update a skill type
+    async fn update_skill_type(
+        &self,
+        skill_id: &str,
+        update: &SkillTypeUpdate,
+    ) -> Result<glyph_domain::SkillType, UpdateSkillTypeError>;
+
+    /// Certify a user skill
+    async fn certify_skill(
+        &self,
+        cert: &CertifyUserSkill,
+    ) -> Result<UserSkillWithStatus, CertifySkillError>;
+
+    /// Revoke a user skill
+    async fn revoke_skill(&self, user_id: &UserId, skill_id: &str) -> Result<(), RevokeSkillError>;
+
+    /// List a user's skills with computed status
+    async fn list_user_skills(
+        &self,
+        user_id: &UserId,
+    ) -> Result<Vec<UserSkillWithStatus>, sqlx::Error>;
+
+    /// Get a specific user skill
+    async fn get_user_skill(
+        &self,
+        user_id: &UserId,
+        skill_id: &str,
+    ) -> Result<Option<UserSkillWithStatus>, sqlx::Error>;
 }
