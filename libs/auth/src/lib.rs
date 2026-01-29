@@ -34,5 +34,9 @@ pub use tokens::{
     ACCESS_TOKEN_COOKIE, PKCE_STATE_COOKIE, REFRESH_TOKEN_COOKIE,
 };
 
+// Re-export cookie types for consumers
+pub use cookie::time as cookie_time;
+pub use cookie::{Cookie, SameSite};
+
 // Modules to be added in subsequent plans:
 // pub mod audit;   // 03-06: Audit logging

@@ -1,6 +1,7 @@
 //! API route definitions
 
 mod annotations;
+pub mod auth;
 mod health;
 mod projects;
 mod tasks;
@@ -8,6 +9,8 @@ mod users;
 mod workflows;
 
 use axum::Router;
+
+pub use auth::AuthState;
 
 /// Build the API router with all routes
 pub fn api_routes() -> Router {
@@ -24,6 +27,11 @@ fn api_v1_routes() -> Router {
         .nest("/annotations", annotations::routes())
         .nest("/projects", projects::routes())
         .nest("/workflows", workflows::routes())
+}
+
+/// Build auth router with state
+pub fn auth_routes(state: AuthState) -> Router<()> {
+    auth::routes().with_state(state)
 }
 
 /// Get all route paths for OpenAPI documentation

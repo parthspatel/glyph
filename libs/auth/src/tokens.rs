@@ -27,12 +27,12 @@ pub const PKCE_STATE_DURATION: Duration = Duration::minutes(10);
 /// Create cookies for storing authentication tokens.
 ///
 /// Returns (access_cookie, Option<refresh_cookie>).
-/// These are plain Cookie objects - the caller wraps them in PrivateCookieJar.
+/// These are plain Cookie objects - the caller wraps them in CookieJar.
 #[must_use]
-pub fn set_auth_cookies<'a>(
-    access_token: &'a str,
-    refresh_token: Option<&'a str>,
-) -> (Cookie<'a>, Option<Cookie<'a>>) {
+pub fn set_auth_cookies(
+    access_token: String,
+    refresh_token: Option<String>,
+) -> (Cookie<'static>, Option<Cookie<'static>>) {
     let access_cookie = Cookie::build((ACCESS_TOKEN_COOKIE, access_token))
         .http_only(true)
         .secure(true)
@@ -83,7 +83,7 @@ pub fn clear_auth_cookies<'a>() -> (Cookie<'a>, Cookie<'a>) {
 ///
 /// Stores csrf_token, nonce, and verifier as a pipe-separated string.
 #[must_use]
-pub fn set_pkce_cookie<'a>(csrf: &str, nonce: &str, verifier: &str) -> Cookie<'a> {
+pub fn set_pkce_cookie(csrf: &str, nonce: &str, verifier: &str) -> Cookie<'static> {
     let value = format!("{}|{}|{}", csrf, nonce, verifier);
     Cookie::build((PKCE_STATE_COOKIE, value))
         .http_only(true)
@@ -129,7 +129,8 @@ mod tests {
 
     #[test]
     fn set_auth_cookies_creates_both() {
-        let (access, refresh) = set_auth_cookies("access123", Some("refresh456"));
+        let (access, refresh) =
+            set_auth_cookies("access123".to_string(), Some("refresh456".to_string()));
         assert_eq!(access.name(), ACCESS_TOKEN_COOKIE);
         assert_eq!(access.value(), "access123");
         assert!(access.http_only().unwrap_or(false));
@@ -142,7 +143,7 @@ mod tests {
 
     #[test]
     fn set_auth_cookies_without_refresh() {
-        let (access, refresh) = set_auth_cookies("access123", None);
+        let (access, refresh) = set_auth_cookies("access123".to_string(), None);
         assert_eq!(access.name(), ACCESS_TOKEN_COOKIE);
         assert!(refresh.is_none());
     }

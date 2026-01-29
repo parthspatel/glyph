@@ -10,7 +10,7 @@ use axum_extra::extract::cookie::CookieJar;
 use glyph_auth::{validate_jwt, Auth0Config, Claims, JwksCache, ACCESS_TOKEN_COOKIE};
 use glyph_domain::UserId;
 
-use crate::ApiError;
+use crate::error::ApiError;
 
 /// Shared authentication state available via request extensions.
 #[derive(Clone)]
