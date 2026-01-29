@@ -14,7 +14,7 @@ name = "glyph-server"
 path = "src/main.rs"
 
 [dependencies]
-glyph-domain = { path = "../../libs/domain" }
+glyph-domain = { path = "../../libs/domain", features = ["utoipa"] }
 glyph-db = { path = "../../libs/db" }
 glyph-auth = { path = "../../libs/auth" }
 glyph-common = { path = "../../libs/common" }

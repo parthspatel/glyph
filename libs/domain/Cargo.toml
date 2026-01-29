@@ -16,6 +16,11 @@ typeshare.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 thiserror.workspace = true
+utoipa = { workspace = true, optional = true }
+
+[features]
+default = []
+utoipa = ["dep:utoipa"]
 
 [lints]
 workspace = true

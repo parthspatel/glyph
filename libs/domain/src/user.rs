@@ -21,6 +21,7 @@ pub enum GlobalRole {
 /// Contact information for a user
 #[typeshare]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ContactInfo {
     pub phone: Option<String>,
     pub slack_handle: Option<String>,
