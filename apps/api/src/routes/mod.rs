@@ -2,7 +2,9 @@
 
 mod annotations;
 pub mod auth;
+mod data_sources;
 mod health;
+mod project_types;
 mod projects;
 mod skills;
 mod tasks;
@@ -31,6 +33,11 @@ fn api_v1_routes() -> Router {
         .nest("/tasks", tasks::routes())
         .nest("/annotations", annotations::routes())
         .nest("/projects", projects::routes())
+        .nest(
+            "/projects/{project_id}/data-sources",
+            data_sources::routes(),
+        )
+        .nest("/project-types", project_types::routes())
         .nest("/workflows", workflows::routes())
 }
 

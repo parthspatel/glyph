@@ -123,6 +123,7 @@ define_prefixed_id!(UserId, "user");
 define_prefixed_id!(TeamId, "team");
 define_prefixed_id!(ProjectId, "proj");
 define_prefixed_id!(ProjectTypeId, "ptype");
+define_prefixed_id!(DataSourceId, "dsrc");
 define_prefixed_id!(TaskId, "task");
 define_prefixed_id!(AnnotationId, "annot");
 define_prefixed_id!(WorkflowId, "wf");

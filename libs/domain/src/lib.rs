@@ -4,6 +4,7 @@
 //! used throughout the Glyph data annotation platform.
 
 pub mod annotation;
+pub mod data_source;
 pub mod enums;
 pub mod goal;
 pub mod ids;
@@ -17,6 +18,7 @@ pub mod user;
 pub mod workflow;
 
 pub use annotation::*;
+pub use data_source::*;
 pub use enums::*;
 pub use goal::*;
 pub use ids::*;
