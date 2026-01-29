@@ -11,6 +11,7 @@ pub mod extractors;
 pub mod middleware;
 pub mod openapi;
 pub mod routes;
+pub mod services;
 
 pub use error::ApiError;
 pub use openapi::ApiDoc;
