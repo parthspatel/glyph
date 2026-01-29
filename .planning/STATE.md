@@ -5,9 +5,9 @@
 ## Current Position
 
 - **Milestone**: v1.0
-- **Current Phase**: 4 (User & Team Management)
+- **Current Phase**: 5 (Project Management)
 - **Phase Status**: Ready
-- **Overall Progress**: 21% (3/14 phases)
+- **Overall Progress**: 29% (4/14 phases)
 
 ## Phase Summary
 
@@ -16,8 +16,8 @@
 | 1 | Foundation | ✅ Verified | [SUMMARY.md](phases/01-foundation/SUMMARY.md), [VERIFICATION.md](phases/01-foundation/01-foundation-VERIFICATION.md) |
 | 2 | Core Domain | ✅ Verified | [VERIFICATION.md](phases/02-core-domain/02-VERIFICATION.md) |
 | 3 | Authentication | ✅ Verified | [VERIFICATION.md](phases/03-authentication/03-VERIFICATION.md) |
-| 4 | User & Team Management | 🟡 Ready | — |
-| 5 | Project Management | ⚪ Blocked | — |
+| 4 | User & Team Management | ✅ Verified | [VERIFICATION.md](phases/04-user-team-management/04-VERIFICATION.md) |
+| 5 | Project Management | 🟡 Ready | — |
 | 6 | Workflow Engine | ⚪ Blocked | — |
 | 7 | Task Management | ⚪ Blocked | — |
 | 8 | Layout System | ⚪ Blocked | — |
@@ -30,6 +30,16 @@
 
 ## Recent Activity
 
+- **2026-01-29**: Phase 4 (User & Team Management) verified
+  - User CRUD API with pagination and filtering
+  - Skill management with certification/expiration
+  - Team CRUD with hierarchy support (parent_team_id)
+  - Team membership management endpoints
+  - RBAC: RequireAdmin, RequireTeamLead extractors
+  - PermissionService with cascade hierarchy checks
+  - User profile page with skills and quality stats
+  - Admin users page with TanStack Table and bulk actions
+  - Team management UI with tree view and member management
 - **2026-01-28**: Phase 3 (Authentication) verified
   - JWT validation with JWKS auto-refresh
   - Auth0 OAuth2/OIDC with PKCE
@@ -55,6 +65,9 @@
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-01-29 | DevMode extension for auth bypass | Enables development without Auth0 configuration |
+| 2026-01-29 | UUID binding via as_uuid() | Prefixed ID strings incompatible with PostgreSQL UUID columns |
+| 2026-01-29 | PostgreSQL enum cast to text | SQLx cannot directly decode custom PostgreSQL enums |
 | 2026-01-28 | Direct HTTP for Auth0 OIDC | openidconnect crate too complex; direct calls simpler |
 | 2026-01-28 | HttpOnly cookies for tokens | More secure than localStorage, automatic refresh path restriction |
 | 2026-01-28 | Tracing for audit logs | OpenTelemetry compatible, integrates with existing infrastructure |
@@ -73,25 +86,32 @@ None.
 
 ## Session Continuity
 
-Last worked: 2026-01-28
-Context: Phase 3 verified, ready for Phase 4 (User & Team Management)
+Last worked: 2026-01-29
+Context: Phase 4 verified, ready for Phase 5 (Project Management)
 
 ## Next Actions
 
-1. Run `/gsd:plan-phase 4` to plan the User & Team Management phase
-2. Phase 4 covers: User CRUD, skills, roles, teams, RBAC permissions
+1. Run `/gsd:plan-phase 5` to plan the Project Management phase
+2. Phase 5 covers: Project CRUD, project types, schema validation, data sources
 
-## Phase 3 Deliverables
+## Phase 4 Deliverables
 
 | Deliverable | Status |
 |-------------|--------|
-| Auth0Config (libs/auth/src/config.rs) | ✅ |
-| AuthError types (libs/auth/src/error.rs) | ✅ |
-| JWKS cache (libs/auth/src/jwks.rs) | ✅ |
-| JWT validation (libs/auth/src/jwt.rs) | ✅ |
-| Auth0Client OIDC (libs/auth/src/oidc.rs) | ✅ |
-| Token cookies (libs/auth/src/tokens.rs) | ✅ |
-| Audit events (libs/auth/src/audit.rs) | ✅ |
-| Auth endpoints (apps/api/src/routes/auth.rs) | ✅ |
-| CurrentUser extractor (apps/api/src/extractors/current_user.rs) | ✅ |
-| Audit middleware (apps/api/src/middleware/audit.rs) | ✅ |
+| User CRUD API (apps/api/src/routes/users.rs) | ✅ |
+| Skill management API (apps/api/src/routes/skills.rs) | ✅ |
+| Team CRUD API (apps/api/src/routes/teams.rs) | ✅ |
+| Team membership endpoints | ✅ |
+| RequireAdmin extractor | ✅ |
+| RequireTeamLead extractor with cascade | ✅ |
+| PermissionService | ✅ |
+| User profile page (apps/web/src/pages/UserProfilePage.tsx) | ✅ |
+| Admin users page (apps/web/src/pages/admin/UsersPage.tsx) | ✅ |
+| Teams page (apps/web/src/pages/TeamsPage.tsx) | ✅ |
+| Team detail page (apps/web/src/pages/TeamDetailPage.tsx) | ✅ |
+| SkillBadges component | ✅ |
+| QualityStats component | ✅ |
+| UserTable with TanStack | ✅ |
+| TeamTree component | ✅ |
+| MemberList component | ✅ |
+| AddMemberModal component | ✅ |
