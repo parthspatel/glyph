@@ -81,6 +81,16 @@
 
 **Requirements Covered**: REQ-AUTH-001, REQ-AUTH-002, REQ-AUTH-004
 
+**Plans:** 6 plans in 5 waves
+
+Plans:
+- [ ] 03-01-PLAN.md — Auth foundation (deps, config, errors)
+- [ ] 03-02-PLAN.md — JWKS cache + JWT validation
+- [ ] 03-03-PLAN.md — OIDC client (Auth0)
+- [ ] 03-04-PLAN.md — Token cookies + CurrentUser extractor
+- [ ] 03-05-PLAN.md — Auth endpoints (login/callback/logout/refresh)
+- [ ] 03-06-PLAN.md — Audit logging
+
 ### Deliverables
 - [ ] JWT token generation and validation
 - [ ] Refresh token rotation
