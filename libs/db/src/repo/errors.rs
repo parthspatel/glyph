@@ -244,3 +244,57 @@ pub enum RevokeSkillError {
     #[error("database error")]
     Database(#[source] sqlx::Error),
 }
+
+// =============================================================================
+// Project Type Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateProjectTypeError {
+    #[error("project type name already exists: {0}")]
+    NameExists(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindProjectTypeError {
+    #[error("project type not found: {0}")]
+    NotFound(glyph_domain::ProjectTypeId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateProjectTypeError {
+    #[error("project type not found: {0}")]
+    NotFound(glyph_domain::ProjectTypeId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum DeleteProjectTypeError {
+    #[error("project type not found: {0}")]
+    NotFound(glyph_domain::ProjectTypeId),
+    #[error("project type is in use by projects")]
+    InUse,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum AddSkillRequirementError {
+    #[error("project type not found")]
+    ProjectTypeNotFound,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum RemoveSkillRequirementError {
+    #[error("skill requirement not found")]
+    NotFound,
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}

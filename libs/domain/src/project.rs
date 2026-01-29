@@ -24,20 +24,7 @@ pub struct Project {
     pub created_by: UserId,
 }
 
-/// A project type defining schemas and configurations
-#[typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectType {
-    pub project_type_id: ProjectTypeId,
-    pub name: String,
-    pub description: Option<String>,
-    pub input_schema: serde_json::Value,
-    pub output_schema: serde_json::Value,
-    pub required_skills: Vec<String>,
-    pub default_workflow_id: Option<WorkflowId>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
+// Note: ProjectType is defined in project_type.rs with full schema support
 
 /// Project-level settings
 #[typeshare]
