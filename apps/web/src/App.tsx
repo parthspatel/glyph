@@ -1,4 +1,3 @@
-import React from "react";
 import { Routes, Route } from "react-router-dom";
 
 // Pages
@@ -7,8 +6,9 @@ import { ProjectsPage } from "./pages/ProjectsPage";
 import { TasksPage } from "./pages/TasksPage";
 import { AnnotatePage } from "./pages/AnnotatePage";
 import { UserProfilePage } from "./pages/UserProfilePage";
+import { AdminUsersPage } from "./pages/admin/UsersPage";
 
-export function App(): React.ReactElement {
+export function App() {
   return (
     <div className="app">
       <Routes>
@@ -17,6 +17,7 @@ export function App(): React.ReactElement {
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/annotate/:taskId" element={<AnnotatePage />} />
         <Route path="/users/:userId" element={<UserProfilePage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
       </Routes>
     </div>
   );
