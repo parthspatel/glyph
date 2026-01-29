@@ -41,6 +41,7 @@ config.workspace = true
 dotenvy.workspace = true
 sqlx.workspace = true
 reqwest.workspace = true
+jsonschema.workspace = true
 axum-extra = { version = "0.10", features = ["cookie-private"] }
 
 [lints]
