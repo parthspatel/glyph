@@ -25,8 +25,8 @@ pub enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
 
-    #[error("forbidden")]
-    Forbidden,
+    #[error("forbidden: requires {permission}")]
+    Forbidden { permission: String },
 
     #[error("conflict: {message}")]
     Conflict { code: &'static str, message: String },
@@ -50,7 +50,7 @@ impl ApiError {
             },
             Self::BadRequest { code, .. } => code,
             Self::Unauthorized => "auth.unauthorized",
-            Self::Forbidden => "auth.forbidden",
+            Self::Forbidden { .. } => "auth.forbidden",
             Self::Conflict { code, .. } => code,
             Self::Internal(_) => "internal",
         }
@@ -62,7 +62,7 @@ impl ApiError {
             Self::NotFound { .. } => "Resource Not Found",
             Self::BadRequest { .. } => "Bad Request",
             Self::Unauthorized => "Unauthorized",
-            Self::Forbidden => "Forbidden",
+            Self::Forbidden { .. } => "Forbidden",
             Self::Conflict { .. } => "Conflict",
             Self::Internal(_) => "Internal Server Error",
         }
@@ -99,7 +99,7 @@ impl IntoResponse for ApiError {
             ApiError::NotFound { .. } => StatusCode::NOT_FOUND,
             ApiError::BadRequest { .. } => StatusCode::BAD_REQUEST,
             ApiError::Unauthorized => StatusCode::UNAUTHORIZED,
-            ApiError::Forbidden => StatusCode::FORBIDDEN,
+            ApiError::Forbidden { .. } => StatusCode::FORBIDDEN,
             ApiError::Conflict { .. } => StatusCode::CONFLICT,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
