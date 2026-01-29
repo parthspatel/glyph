@@ -1,10 +1,11 @@
 //! User domain models
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
+use uuid::Uuid;
 
-use crate::enums::{ProficiencyLevel, UserStatus};
+use crate::enums::{ProficiencyLevel, SkillStatus, UserStatus};
 use crate::ids::UserId;
 
 /// A user in the system
@@ -22,7 +23,7 @@ pub struct User {
     pub updated_at: DateTime<Utc>,
 }
 
-/// A skill that a user possesses
+/// A skill that a user possesses (legacy format)
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSkill {
@@ -43,4 +44,51 @@ pub struct QualityProfile {
     pub total_annotations: i64,
     pub approved_annotations: i64,
     pub rejected_annotations: i64,
+}
+
+/// User skill certification (normalized table format)
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserSkillCertification {
+    pub certification_id: Uuid,
+    pub skill_id: String,
+    pub proficiency_level: Option<String>,
+    pub certified_by: Option<UserId>,
+    pub certified_at: DateTime<Utc>,
+    pub expires_at: Option<DateTime<Utc>>,
+    pub notes: Option<String>,
+}
+
+impl UserSkillCertification {
+    /// Compute the status of this certification based on expiration and grace period
+    pub fn status(&self, grace_period_days: i32) -> SkillStatus {
+        let Some(expires_at) = self.expires_at else {
+            return SkillStatus::NeverExpires;
+        };
+        let now = Utc::now();
+        if now < expires_at {
+            return SkillStatus::Active;
+        }
+        let grace_end = expires_at + Duration::days(grace_period_days as i64);
+        if now < grace_end {
+            SkillStatus::SoftExpired
+        } else {
+            SkillStatus::HardExpired
+        }
+    }
+}
+
+/// Configurable skill type template
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillType {
+    pub skill_id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub expiration_months: Option<i32>,
+    pub grace_period_days: i32,
+    pub requires_proficiency: bool,
+    pub proficiency_levels: Option<Vec<String>>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }

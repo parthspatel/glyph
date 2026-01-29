@@ -22,7 +22,6 @@ pub enum TeamStatus {
 #[serde(rename_all = "snake_case")]
 pub enum TeamRole {
     Leader,
-    Manager,
     Member,
 }
 
@@ -31,9 +30,9 @@ pub enum TeamRole {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Team {
     pub team_id: TeamId,
+    pub parent_team_id: Option<TeamId>,
     pub name: String,
     pub description: Option<String>,
-    pub leader_id: UserId,
     pub status: TeamStatus,
     pub capacity: Option<i32>,
     pub specializations: Vec<String>,

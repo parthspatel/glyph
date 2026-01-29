@@ -255,3 +255,14 @@ pub enum ProficiencyLevel {
     Advanced,
     Expert,
 }
+
+/// Status of a user's skill certification
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillStatus {
+    Active,
+    SoftExpired,
+    HardExpired,
+    NeverExpires,
+}
