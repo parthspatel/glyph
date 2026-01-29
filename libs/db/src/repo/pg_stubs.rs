@@ -6,54 +6,12 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use glyph_domain::{Annotation, Project, Task, Workflow};
+use glyph_domain::{Annotation, Task, Workflow};
 use glyph_domain::{AnnotationId, ProjectId, TaskId, WorkflowId};
 
 use crate::pagination::{Page, Pagination};
 use crate::repo::errors::*;
 use crate::repo::traits::*;
-
-// =============================================================================
-// Project Repository Stub
-// =============================================================================
-
-pub struct PgProjectRepository {
-    #[allow(dead_code)]
-    pool: PgPool,
-}
-
-impl PgProjectRepository {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-}
-
-#[async_trait]
-impl ProjectRepository for PgProjectRepository {
-    async fn find_by_id(&self, _id: &ProjectId) -> Result<Option<Project>, FindProjectError> {
-        todo!("Implement in Phase 5")
-    }
-
-    async fn create(&self, _project: &NewProject) -> Result<Project, CreateProjectError> {
-        todo!("Implement in Phase 5")
-    }
-
-    async fn update(
-        &self,
-        _id: &ProjectId,
-        _update: &ProjectUpdate,
-    ) -> Result<Project, UpdateProjectError> {
-        todo!("Implement in Phase 5")
-    }
-
-    async fn list(&self, _pagination: Pagination) -> Result<Page<Project>, sqlx::Error> {
-        todo!("Implement in Phase 5")
-    }
-
-    async fn soft_delete(&self, _id: &ProjectId) -> Result<(), UpdateProjectError> {
-        todo!("Implement in Phase 5")
-    }
-}
 
 // =============================================================================
 // Task Repository Stub
