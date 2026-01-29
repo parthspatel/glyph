@@ -18,14 +18,16 @@
 
 pub mod config;
 pub mod error;
+pub mod jwks;
+pub mod jwt;
 
 // Re-exports for convenience
 pub use config::{Auth0Config, ConfigError};
 pub use error::{AuthError, AuthResult};
+pub use jwks::JwksCache;
+pub use jwt::{validate_jwt, Audience, Claims};
 
 // Modules to be added in subsequent plans:
-// pub mod jwks;    // 03-02: JWKS caching
-// pub mod jwt;     // 03-02: JWT validation
 // pub mod oidc;    // 03-03: OIDC client
 // pub mod tokens;  // 03-04: Token cookie helpers
 // pub mod audit;   // 03-06: Audit logging
