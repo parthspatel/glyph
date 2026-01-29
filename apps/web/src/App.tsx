@@ -7,6 +7,8 @@ import { TasksPage } from "./pages/TasksPage";
 import { AnnotatePage } from "./pages/AnnotatePage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 import { AdminUsersPage } from "./pages/admin/UsersPage";
+import { TeamsPage } from "./pages/TeamsPage";
+import { TeamDetailPage } from "./pages/TeamDetailPage";
 
 export function App() {
   return (
@@ -18,6 +20,8 @@ export function App() {
         <Route path="/annotate/:taskId" element={<AnnotatePage />} />
         <Route path="/users/:userId" element={<UserProfilePage />} />
         <Route path="/admin/users" element={<AdminUsersPage />} />
+        <Route path="/teams" element={<TeamsPage />} />
+        <Route path="/teams/:teamId" element={<TeamDetailPage />} />
       </Routes>
     </div>
   );
