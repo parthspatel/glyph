@@ -23,6 +23,7 @@ serde_json.workspace = true
 typeshare.workspace = true
 chrono.workspace = true
 uuid.workspace = true
+jsonschema.workspace = true
 
 [lints]
 workspace = true

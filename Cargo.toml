@@ -94,6 +94,12 @@ sha2 = "0.10"
 base64 = "0.22"
 cookie = { version = "0.18", features = ["private"] }
 
+# Schema validation
+jsonschema = "0.26"
+
+# Cloud storage
+object_store = { version = "0.11", features = ["aws", "gcp", "azure"] }
+
 # Testing
 mockall = "0.13"
 
