@@ -4,12 +4,14 @@ use axum::{
     extract::{Path, Query},
     http::StatusCode,
     routing::{get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use utoipa::ToSchema;
 
-use glyph_domain::{ProjectId, ProjectStatus};
+use glyph_db::{ExtendedProjectUpdate, Pagination, PgProjectRepository, ProjectRepository};
+use glyph_domain::{Project, ProjectId, ProjectStatus, ProjectTypeId, TeamId};
 
 use crate::error::ApiError;
 use crate::extractors::CurrentUser;
@@ -65,6 +67,26 @@ pub struct ProjectSummaryResponse {
     pub created_by: String,
 }
 
+impl From<Project> for ProjectSummaryResponse {
+    fn from(p: Project) -> Self {
+        Self {
+            project_id: p.project_id.to_string(),
+            name: p.name,
+            description: p.description,
+            status: format!("{:?}", p.status).to_lowercase(),
+            project_type_name: None, // Would need join to get this
+            team_name: None,         // Would need join to get this
+            task_count: 0,           // Would need aggregation
+            completed_task_count: 0, // Would need aggregation
+            completion_percentage: 0.0,
+            tags: p.tags,
+            deadline: p.deadline.map(|d| d.to_rfc3339()),
+            created_at: p.created_at.to_rfc3339(),
+            created_by: p.created_by.to_string(),
+        }
+    }
+}
+
 /// Project detail response
 #[derive(Debug, Serialize, ToSchema)]
 pub struct ProjectDetailResponse {
@@ -88,6 +110,72 @@ pub struct ProjectDetailResponse {
     pub can_activate: bool,
     pub activation_errors: Vec<String>,
     pub allowed_transitions: Vec<String>,
+}
+
+impl From<Project> for ProjectDetailResponse {
+    fn from(p: Project) -> Self {
+        let status = p.status;
+        let allowed_transitions = get_allowed_transitions(status);
+        let (can_activate, activation_errors) = check_activation_readiness(&p);
+
+        Self {
+            project_id: p.project_id.to_string(),
+            name: p.name,
+            description: p.description,
+            status: format!("{:?}", status).to_lowercase(),
+            project_type_id: p.project_type_id.map(|id| id.to_string()),
+            workflow_id: p.workflow_id.map(|id| id.to_string()),
+            layout_id: p.layout_id,
+            team_id: p.team_id.map(|id| id.to_string()),
+            settings: ProjectSettingsResponse {
+                allow_self_review: p.settings.allow_self_review,
+                require_all_fields: p.settings.require_all_fields,
+                max_assignments_per_user: p.settings.max_assignments_per_user,
+                assignment_timeout_hours: p.settings.assignment_timeout_hours,
+                quality_threshold: p.settings.quality_threshold,
+                auto_complete_enabled: p.settings.auto_complete_enabled,
+            },
+            tags: p.tags,
+            documentation: p.documentation,
+            deadline: p.deadline.map(|d| d.to_rfc3339()),
+            deadline_action: p.deadline_action.map(|a| format!("{:?}", a).to_lowercase()),
+            created_at: p.created_at.to_rfc3339(),
+            updated_at: p.updated_at.to_rfc3339(),
+            created_by: p.created_by.to_string(),
+            can_activate,
+            activation_errors,
+            allowed_transitions,
+        }
+    }
+}
+
+/// Get allowed status transitions based on current status
+fn get_allowed_transitions(status: ProjectStatus) -> Vec<String> {
+    match status {
+        ProjectStatus::Draft => vec!["active".to_string(), "archived".to_string()],
+        ProjectStatus::Active => vec!["paused".to_string(), "completed".to_string()],
+        ProjectStatus::Paused => vec!["active".to_string(), "archived".to_string()],
+        ProjectStatus::Completed => vec!["archived".to_string()],
+        ProjectStatus::Archived => vec!["draft".to_string()], // Can unarchive to draft
+        ProjectStatus::Deleted => vec![],
+    }
+}
+
+/// Check if project can be activated
+fn check_activation_readiness(project: &Project) -> (bool, Vec<String>) {
+    let mut errors = Vec::new();
+
+    if project.status != ProjectStatus::Draft {
+        errors.push("Project must be in draft status".to_string());
+    }
+
+    // Future: Check for required schema, data sources, etc.
+    // For now, draft projects without workflow/layout show what's missing
+    if project.workflow_id.is_none() && project.layout_id.is_none() {
+        errors.push("Output schema not configured".to_string());
+    }
+
+    (errors.is_empty(), errors)
 }
 
 /// Request to create a new project
@@ -179,16 +267,30 @@ pub fn routes() -> Router {
 async fn list_projects(
     Query(params): Query<ListProjectsQuery>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<Json<ProjectListResponse>, ApiError> {
-    // For now return placeholder - will be implemented with actual DB query
-    let limit = params.limit.unwrap_or(20);
-    let offset = params.offset.unwrap_or(0);
+    let pagination = Pagination {
+        limit: params.limit.unwrap_or(20),
+        offset: params.offset.unwrap_or(0),
+        sort_by: None,
+        sort_order: Default::default(),
+    };
+
+    let repo = PgProjectRepository::new(pool);
+    let page = repo
+        .list(pagination)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
 
     Ok(Json(ProjectListResponse {
-        items: vec![],
-        total: 0,
-        limit,
-        offset,
+        items: page
+            .items
+            .into_iter()
+            .map(ProjectSummaryResponse::from)
+            .collect(),
+        total: page.total,
+        limit: page.limit,
+        offset: page.offset,
     }))
 }
 
@@ -208,13 +310,23 @@ async fn list_projects(
 async fn get_project(
     Path(project_id): Path<String>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<Json<ProjectDetailResponse>, ApiError> {
-    let _id: ProjectId = project_id
+    let id: ProjectId = project_id
         .parse()
         .map_err(|_| ApiError::not_found("project", &project_id))?;
 
-    // Placeholder - will implement with actual DB query
-    Err(ApiError::not_found("project", &project_id))
+    let repo = PgProjectRepository::new(pool);
+    let project = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to find project {}: {:?}", project_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
+        .ok_or_else(|| ApiError::not_found("project", &project_id))?;
+
+    Ok(Json(ProjectDetailResponse::from(project)))
 }
 
 /// Create a new project
@@ -230,6 +342,7 @@ async fn get_project(
 )]
 async fn create_project(
     current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
     Json(req): Json<CreateProjectRequest>,
 ) -> Result<(StatusCode, Json<ProjectDetailResponse>), ApiError> {
     // Validate name
@@ -240,33 +353,57 @@ async fn create_project(
         ));
     }
 
-    // Placeholder response - will implement with actual DB insert
-    let response = ProjectDetailResponse {
-        project_id: ProjectId::new().to_string(),
-        name: req.name,
-        description: req.description,
-        status: "draft".to_string(),
-        project_type_id: req.project_type_id,
-        workflow_id: None,
-        layout_id: None,
-        team_id: req.team_id,
-        settings: req.settings.unwrap_or_default(),
-        tags: req.tags.unwrap_or_default(),
-        documentation: req.documentation,
-        deadline: req.deadline,
-        deadline_action: req.deadline_action,
-        created_at: chrono::Utc::now().to_rfc3339(),
-        updated_at: chrono::Utc::now().to_rfc3339(),
-        created_by: current_user.user_id.to_string(),
-        can_activate: false,
-        activation_errors: vec![
-            "Output schema not configured".to_string(),
-            "No data sources configured".to_string(),
-        ],
-        allowed_transitions: vec!["active".to_string(), "archived".to_string()],
-    };
+    let repo = PgProjectRepository::new(pool.clone());
+    let project = repo
+        .create_minimal(&req.name, req.description.as_deref(), &current_user.user_id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create project: {:?}", e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?;
 
-    Ok((StatusCode::CREATED, Json(response)))
+    // If additional fields provided, update them
+    if req.project_type_id.is_some()
+        || req.team_id.is_some()
+        || req.tags.is_some()
+        || req.documentation.is_some()
+        || req.deadline.is_some()
+    {
+        let update = ExtendedProjectUpdate {
+            project_type_id: req
+                .project_type_id
+                .and_then(|s| s.parse::<ProjectTypeId>().ok()),
+            team_id: req.team_id.and_then(|s| s.parse::<TeamId>().ok()),
+            tags: req.tags,
+            documentation: req.documentation,
+            deadline: req.deadline.and_then(|s| {
+                chrono::DateTime::parse_from_rfc3339(&s)
+                    .ok()
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+            }),
+            deadline_action: req.deadline_action.and_then(|s| parse_deadline_action(&s)),
+            ..Default::default()
+        };
+
+        let repo = PgProjectRepository::new(pool);
+        let updated = repo
+            .update_extended(&project.project_id, &update)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to update project after create: {:?}", e);
+                ApiError::Internal(anyhow::anyhow!("{}", e))
+            })?;
+
+        return Ok((
+            StatusCode::CREATED,
+            Json(ProjectDetailResponse::from(updated)),
+        ));
+    }
+
+    Ok((
+        StatusCode::CREATED,
+        Json(ProjectDetailResponse::from(project)),
+    ))
 }
 
 /// Update a project
@@ -286,14 +423,46 @@ async fn create_project(
 async fn update_project(
     Path(project_id): Path<String>,
     _current_user: CurrentUser,
-    Json(_req): Json<UpdateProjectRequest>,
+    Extension(pool): Extension<PgPool>,
+    Json(req): Json<UpdateProjectRequest>,
 ) -> Result<Json<ProjectDetailResponse>, ApiError> {
-    let _id: ProjectId = project_id
+    let id: ProjectId = project_id
         .parse()
         .map_err(|_| ApiError::not_found("project", &project_id))?;
 
-    // Placeholder - will implement with actual DB update
-    Err(ApiError::not_found("project", &project_id))
+    let update = ExtendedProjectUpdate {
+        name: req.name,
+        description: req.description,
+        project_type_id: req
+            .project_type_id
+            .and_then(|s| s.parse::<ProjectTypeId>().ok()),
+        team_id: req.team_id.and_then(|s| s.parse::<TeamId>().ok()),
+        tags: req.tags,
+        documentation: req.documentation,
+        deadline: req.deadline.and_then(|s| {
+            chrono::DateTime::parse_from_rfc3339(&s)
+                .ok()
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+        }),
+        deadline_action: req.deadline_action.and_then(|s| parse_deadline_action(&s)),
+        ..Default::default()
+    };
+
+    let repo = PgProjectRepository::new(pool);
+    let project = repo
+        .update_extended(&id, &update)
+        .await
+        .map_err(|e| match e {
+            glyph_db::UpdateProjectError::NotFound(_) => {
+                ApiError::not_found("project", &project_id)
+            }
+            glyph_db::UpdateProjectError::Database(e) => {
+                tracing::error!("Failed to update project: {:?}", e);
+                ApiError::Internal(anyhow::anyhow!("{}", e))
+            }
+        })?;
+
+    Ok(Json(ProjectDetailResponse::from(project)))
 }
 
 /// Delete a project (soft delete)
@@ -312,13 +481,22 @@ async fn update_project(
 async fn delete_project(
     Path(project_id): Path<String>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<StatusCode, ApiError> {
-    let _id: ProjectId = project_id
+    let id: ProjectId = project_id
         .parse()
         .map_err(|_| ApiError::not_found("project", &project_id))?;
 
-    // Placeholder - will implement with actual soft delete
-    Err(ApiError::not_found("project", &project_id))
+    let repo = PgProjectRepository::new(pool);
+    repo.soft_delete(&id).await.map_err(|e| match e {
+        glyph_db::UpdateProjectError::NotFound(_) => ApiError::not_found("project", &project_id),
+        glyph_db::UpdateProjectError::Database(e) => {
+            tracing::error!("Failed to delete project: {:?}", e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        }
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Update project status
@@ -339,29 +517,68 @@ async fn delete_project(
 async fn update_status(
     Path(project_id): Path<String>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
     Json(req): Json<UpdateStatusRequest>,
 ) -> Result<Json<StatusUpdateResponse>, ApiError> {
-    let _id: ProjectId = project_id
+    let id: ProjectId = project_id
         .parse()
         .map_err(|_| ApiError::not_found("project", &project_id))?;
 
     // Parse target status
-    let _target_status = match req.status.to_lowercase().as_str() {
-        "draft" => ProjectStatus::Draft,
-        "active" => ProjectStatus::Active,
-        "paused" => ProjectStatus::Paused,
-        "completed" => ProjectStatus::Completed,
-        "archived" => ProjectStatus::Archived,
-        _ => {
-            return Err(ApiError::bad_request(
-                "validation.invalid_status",
-                format!("Invalid status: {}", req.status),
-            ))
-        }
+    let target_status = parse_project_status(&req.status).ok_or_else(|| {
+        ApiError::bad_request(
+            "validation.invalid_status",
+            format!("Invalid status: {}", req.status),
+        )
+    })?;
+
+    let repo = PgProjectRepository::new(pool);
+
+    // Get current project to validate transition
+    let current = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to find project {}: {:?}", project_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
+        .ok_or_else(|| ApiError::not_found("project", &project_id))?;
+
+    let from_status = current.status;
+    let allowed = get_allowed_transitions(from_status);
+
+    if !allowed.contains(&format!("{:?}", target_status).to_lowercase()) {
+        return Err(ApiError::bad_request(
+            "validation.invalid_transition",
+            format!(
+                "Cannot transition from {:?} to {:?}",
+                from_status, target_status
+            ),
+        ));
+    }
+
+    // Use basic update for status change
+    let update = glyph_db::ProjectUpdate {
+        status: Some(target_status),
+        ..Default::default()
     };
 
-    // Placeholder - will implement with actual status update
-    Err(ApiError::not_found("project", &project_id))
+    let updated = repo.update(&id, &update).await.map_err(|e| match e {
+        glyph_db::UpdateProjectError::NotFound(_) => ApiError::not_found("project", &project_id),
+        glyph_db::UpdateProjectError::Database(e) => {
+            tracing::error!("Failed to update project status: {:?}", e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        }
+    })?;
+
+    Ok(Json(StatusUpdateResponse {
+        project: ProjectDetailResponse::from(updated),
+        transition_info: Some(TransitionInfo {
+            from_status: format!("{:?}", from_status).to_lowercase(),
+            to_status: format!("{:?}", target_status).to_lowercase(),
+            warnings: vec![],
+        }),
+    }))
 }
 
 /// Activate a project (validate and transition to active)
@@ -381,18 +598,48 @@ async fn update_status(
 async fn activate_project(
     Path(project_id): Path<String>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<Json<ProjectDetailResponse>, ApiError> {
-    let _id: ProjectId = project_id
+    let id: ProjectId = project_id
         .parse()
         .map_err(|_| ApiError::not_found("project", &project_id))?;
 
-    // Placeholder - will validate activation requirements:
-    // 1. Must be in Draft status
-    // 2. Must have output_schema configured (via project_type or direct)
-    // 3. Must have at least one data source
-    // 4. Must have skill requirements defined (if project_type requires them)
+    let repo = PgProjectRepository::new(pool);
 
-    Err(ApiError::not_found("project", &project_id))
+    // Get current project
+    let current = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to find project {}: {:?}", project_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
+        .ok_or_else(|| ApiError::not_found("project", &project_id))?;
+
+    // Check activation readiness
+    let (can_activate, errors) = check_activation_readiness(&current);
+    if !can_activate {
+        return Err(ApiError::bad_request(
+            "validation.activation_failed",
+            format!("Cannot activate project: {}", errors.join(", ")),
+        ));
+    }
+
+    // Update status to active
+    let update = glyph_db::ProjectUpdate {
+        status: Some(ProjectStatus::Active),
+        ..Default::default()
+    };
+
+    let updated = repo.update(&id, &update).await.map_err(|e| match e {
+        glyph_db::UpdateProjectError::NotFound(_) => ApiError::not_found("project", &project_id),
+        glyph_db::UpdateProjectError::Database(e) => {
+            tracing::error!("Failed to activate project: {:?}", e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        }
+    })?;
+
+    Ok(Json(ProjectDetailResponse::from(updated)))
 }
 
 /// Clone a project
@@ -411,18 +658,94 @@ async fn activate_project(
 )]
 async fn clone_project(
     Path(project_id): Path<String>,
-    _current_user: CurrentUser,
-    Json(_req): Json<CloneProjectRequest>,
+    current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
+    Json(req): Json<CloneProjectRequest>,
 ) -> Result<(StatusCode, Json<ProjectDetailResponse>), ApiError> {
-    let _id: ProjectId = project_id
+    let id: ProjectId = project_id
         .parse()
         .map_err(|_| ApiError::not_found("project", &project_id))?;
 
-    // Placeholder - will implement clone logic:
-    // 1. Copy project settings, tags, documentation
-    // 2. Optionally copy data sources (without credentials)
-    // 3. Set status to Draft
-    // 4. Set new name (or append " (copy)")
+    let repo = PgProjectRepository::new(pool);
 
-    Err(ApiError::not_found("project", &project_id))
+    // Get source project
+    let source = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to find project {}: {:?}", project_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
+        .ok_or_else(|| ApiError::not_found("project", &project_id))?;
+
+    // Create new project with cloned data
+    let new_name = req
+        .new_name
+        .unwrap_or_else(|| format!("{} (copy)", source.name));
+
+    let cloned = repo
+        .create_minimal(
+            &new_name,
+            source.description.as_deref(),
+            &current_user.user_id,
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to clone project: {:?}", e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?;
+
+    // Copy settings if requested
+    if req.include_settings {
+        let update = ExtendedProjectUpdate {
+            project_type_id: source.project_type_id,
+            team_id: source.team_id,
+            tags: Some(source.tags),
+            documentation: source.documentation,
+            settings: Some(source.settings),
+            ..Default::default()
+        };
+
+        let updated = repo
+            .update_extended(&cloned.project_id, &update)
+            .await
+            .map_err(|e| {
+                tracing::error!("Failed to apply settings to cloned project: {:?}", e);
+                ApiError::Internal(anyhow::anyhow!("{}", e))
+            })?;
+
+        return Ok((
+            StatusCode::CREATED,
+            Json(ProjectDetailResponse::from(updated)),
+        ));
+    }
+
+    Ok((
+        StatusCode::CREATED,
+        Json(ProjectDetailResponse::from(cloned)),
+    ))
+}
+
+// =============================================================================
+// Helper functions
+// =============================================================================
+
+fn parse_project_status(s: &str) -> Option<ProjectStatus> {
+    match s.to_lowercase().as_str() {
+        "draft" => Some(ProjectStatus::Draft),
+        "active" => Some(ProjectStatus::Active),
+        "paused" => Some(ProjectStatus::Paused),
+        "completed" => Some(ProjectStatus::Completed),
+        "archived" => Some(ProjectStatus::Archived),
+        _ => None,
+    }
+}
+
+fn parse_deadline_action(s: &str) -> Option<glyph_domain::DeadlineAction> {
+    match s.to_lowercase().as_str() {
+        "notify" => Some(glyph_domain::DeadlineAction::Notify),
+        "pause" => Some(glyph_domain::DeadlineAction::Pause),
+        "escalate" => Some(glyph_domain::DeadlineAction::Escalate),
+        _ => None,
+    }
 }
