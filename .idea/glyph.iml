@@ -7,6 +7,16 @@
       <sourceFolder url="file://$MODULE_DIR$/crates/infrastructure/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/plugins/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/crates/services/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/api/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/cli/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/apps/worker/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/auth/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/db/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/domain/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/plugins/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/quality/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/libs/workflow-engine/src" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.devenv" />
       <excludeFolder url="file://$MODULE_DIR$/.direnv" />
       <excludeFolder url="file://$MODULE_DIR$/target" />
