@@ -55,7 +55,7 @@ async fn main() -> Result<()> {
     let mut app = Router::new()
         .merge(routes::api_routes())
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
-        .layer(Extension(pool))
+        .layer(Extension(pool.clone()))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive());
 
@@ -76,9 +76,10 @@ async fn main() -> Result<()> {
         tracing::warn!("Auth0 not configured - enabling development mode");
         tracing::warn!("Set AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_API_IDENTIFIER, AUTH0_CALLBACK_URL, AUTH0_LOGOUT_REDIRECT_URL to enable production auth");
 
-        // Enable development mode with a mock user
+        // Enable development mode with a mock user that exists in the database
+        let dev_user_id = ensure_dev_user_exists(&pool).await?;
         let dev_mode = DevMode {
-            mock_user_id: UserId::new(),
+            mock_user_id: dev_user_id,
         };
         app = app.layer(Extension(dev_mode));
         tracing::info!("Development mode enabled - all requests use mock admin user");
@@ -93,6 +94,45 @@ async fn main() -> Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+/// Ensure a dev user exists in the database for development mode.
+/// Returns the user ID of the dev user.
+async fn ensure_dev_user_exists(pool: &sqlx::PgPool) -> Result<UserId> {
+    const DEV_USER_EMAIL: &str = "dev@localhost";
+
+    // Check if dev user already exists
+    let existing: Option<(String,)> =
+        sqlx::query_as("SELECT user_id::text FROM users WHERE email = $1")
+            .bind(DEV_USER_EMAIL)
+            .fetch_optional(pool)
+            .await?;
+
+    if let Some((user_id_str,)) = existing {
+        let user_id = user_id_str
+            .parse::<UserId>()
+            .map_err(|e| anyhow::anyhow!("Failed to parse dev user ID: {}", e))?;
+        tracing::info!(user_id = %user_id, "Using existing dev user");
+        return Ok(user_id);
+    }
+
+    // Create dev user
+    let user_id = UserId::new();
+    sqlx::query(
+        r#"
+        INSERT INTO users (user_id, email, display_name, auth0_id, global_role, status)
+        VALUES ($1, $2, $3, $4, 'admin', 'active')
+        "#,
+    )
+    .bind(user_id.as_uuid())
+    .bind(DEV_USER_EMAIL)
+    .bind("Development User")
+    .bind("dev|mock-user")
+    .execute(pool)
+    .await?;
+
+    tracing::info!(user_id = %user_id, "Created dev user");
+    Ok(user_id)
 }
 
 /// Initialize authentication state from environment.

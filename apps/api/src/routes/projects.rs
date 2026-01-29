@@ -277,10 +277,10 @@ async fn list_projects(
     };
 
     let repo = PgProjectRepository::new(pool);
-    let page = repo
-        .list(pagination)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+    let page = repo.list(pagination).await.map_err(|e| {
+        tracing::error!("Failed to list projects: {:?}", e);
+        ApiError::Internal(anyhow::anyhow!("{}", e))
+    })?;
 
     Ok(Json(ProjectListResponse {
         items: page
