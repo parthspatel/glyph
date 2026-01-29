@@ -5,7 +5,10 @@ use axum::{
     http::StatusCode,
     Extension, Json,
 };
-use glyph_db::{NewTeam, Pagination, PgTeamRepository, TeamRepository, TeamTreeNode, TeamUpdate};
+use glyph_db::{
+    NewTeam, Pagination, PgTeamRepository, PgUserRepository, TeamMembershipError,
+    TeamMembershipWithUser, TeamRepository, TeamTreeNode, TeamUpdate, UserRepository,
+};
 use glyph_domain::{TeamId, TeamRole, UserId};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
@@ -89,6 +92,39 @@ impl From<TeamTreeNode> for TeamTreeNodeResponse {
     }
 }
 
+/// Team member response
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TeamMemberResponse {
+    pub user_id: String,
+    pub display_name: String,
+    pub email: String,
+    pub role: String,
+    pub joined_at: String,
+    pub allocation_percentage: Option<i32>,
+}
+
+impl From<TeamMembershipWithUser> for TeamMemberResponse {
+    fn from(m: TeamMembershipWithUser) -> Self {
+        Self {
+            user_id: m.user_id.to_string(),
+            display_name: m.display_name,
+            email: m.email,
+            role: format!("{:?}", m.role).to_lowercase(),
+            joined_at: m.joined_at.to_rfc3339(),
+            allocation_percentage: m.allocation_percentage,
+        }
+    }
+}
+
+/// List response for team members
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TeamMemberListResponse {
+    pub items: Vec<TeamMemberResponse>,
+    pub total: i64,
+    pub limit: i64,
+    pub offset: i64,
+}
+
 // =============================================================================
 // Request Types
 // =============================================================================
@@ -121,6 +157,23 @@ pub struct ListTeamsParams {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
     pub root_only: Option<bool>,
+}
+
+/// Add team member request
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct AddMemberRequest {
+    pub user_id: String,
+    /// Role: "leader" or "member", defaults to "member"
+    #[serde(default)]
+    pub role: Option<String>,
+    pub allocation_percentage: Option<i32>,
+}
+
+/// Update team member request
+#[derive(Debug, Deserialize, ToSchema)]
+pub struct UpdateMemberRequest {
+    pub role: Option<String>,
+    pub allocation_percentage: Option<i32>,
 }
 
 // =============================================================================
@@ -449,6 +502,343 @@ fn parse_team_status_opt(s: &str) -> Option<glyph_domain::TeamStatus> {
 }
 
 // =============================================================================
+// Team Membership Handlers
+// =============================================================================
+
+/// List team members
+#[utoipa::path(
+    get,
+    path = "/teams/{team_id}/members",
+    tag = "teams",
+    params(
+        ("team_id" = String, Path, description = "Team ID"),
+        ("limit" = Option<i64>, Query, description = "Max results"),
+        ("offset" = Option<i64>, Query, description = "Offset")
+    ),
+    responses(
+        (status = 200, description = "Team members", body = TeamMemberListResponse),
+        (status = 404, description = "Team not found")
+    )
+)]
+pub async fn list_team_members(
+    _user: CurrentUser,
+    Path(team_id): Path<String>,
+    Query(pagination): Query<Pagination>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<TeamMemberListResponse>, ApiError> {
+    let id: TeamId = team_id.parse()?;
+
+    let repo = PgTeamRepository::new(pool);
+
+    // Verify team exists
+    let _ = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?
+        .ok_or_else(|| ApiError::not_found("team", team_id))?;
+
+    let page = repo
+        .list_members(&id, pagination)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+
+    Ok(Json(TeamMemberListResponse {
+        items: page
+            .items
+            .into_iter()
+            .map(TeamMemberResponse::from)
+            .collect(),
+        total: page.total,
+        limit: page.limit,
+        offset: page.offset,
+    }))
+}
+
+/// Add a member to a team
+#[utoipa::path(
+    post,
+    path = "/teams/{team_id}/members",
+    tag = "teams",
+    params(("team_id" = String, Path, description = "Team ID")),
+    request_body = AddMemberRequest,
+    responses(
+        (status = 201, description = "Member added", body = TeamMemberResponse),
+        (status = 400, description = "Invalid request"),
+        (status = 403, description = "Requires team leadership"),
+        (status = 404, description = "Team or user not found"),
+        (status = 409, description = "User already a member")
+    )
+)]
+pub async fn add_team_member(
+    current_user: CurrentUser,
+    Path(team_id): Path<String>,
+    Extension(pool): Extension<PgPool>,
+    Json(body): Json<AddMemberRequest>,
+) -> Result<(StatusCode, Json<TeamMemberResponse>), ApiError> {
+    let id: TeamId = team_id.parse()?;
+
+    // Check permission: admin or team leader (with cascade)
+    if !current_user.has_role("admin") {
+        let permission_service = PermissionService::new(pool.clone());
+        let is_leader = permission_service
+            .check_team_leadership_cascade(&current_user.user_id, &id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+        if !is_leader {
+            return Err(ApiError::Forbidden {
+                permission: format!("team:lead({}) or role:admin", id),
+            });
+        }
+    }
+
+    let member_user_id: UserId = body.user_id.parse()?;
+
+    let user_repo = PgUserRepository::new(pool.clone());
+    // Verify user exists
+    let user = user_repo
+        .find_by_id(&member_user_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?
+        .ok_or_else(|| ApiError::not_found("user", body.user_id.clone()))?;
+
+    let role = match body.role.as_deref() {
+        Some("leader") => TeamRole::Leader,
+        Some("member") | None => TeamRole::Member,
+        Some(r) => {
+            return Err(ApiError::bad_request(
+                "team.role.invalid",
+                format!("Invalid role: {}. Must be 'leader' or 'member'", r),
+            ))
+        }
+    };
+
+    let repo = PgTeamRepository::new(pool);
+    let membership = repo
+        .add_member(&id, &member_user_id, role, body.allocation_percentage)
+        .await
+        .map_err(|e| match e {
+            TeamMembershipError::AlreadyMember => ApiError::conflict(
+                "team.member.exists",
+                "User is already a member of this team",
+            ),
+            TeamMembershipError::NotAMember => {
+                ApiError::Internal(anyhow::anyhow!("Unexpected: not member after add"))
+            }
+            TeamMembershipError::Database(e) => ApiError::Internal(anyhow::anyhow!("{}", e)),
+            TeamMembershipError::TeamNotFound(id) => ApiError::not_found("team", id.to_string()),
+            TeamMembershipError::UserNotFound(id) => ApiError::not_found("user", id.to_string()),
+        })?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(TeamMemberResponse {
+            user_id: membership.user_id.to_string(),
+            display_name: user.display_name,
+            email: user.email,
+            role: format!("{:?}", membership.role).to_lowercase(),
+            joined_at: membership.joined_at.to_rfc3339(),
+            allocation_percentage: membership.allocation_percentage,
+        }),
+    ))
+}
+
+/// Remove a member from a team
+#[utoipa::path(
+    delete,
+    path = "/teams/{team_id}/members/{user_id}",
+    tag = "teams",
+    params(
+        ("team_id" = String, Path, description = "Team ID"),
+        ("user_id" = String, Path, description = "User ID to remove")
+    ),
+    responses(
+        (status = 204, description = "Member removed"),
+        (status = 400, description = "Cannot remove last leader"),
+        (status = 403, description = "Requires team leadership"),
+        (status = 404, description = "Member not found")
+    )
+)]
+pub async fn remove_team_member(
+    current_user: CurrentUser,
+    Path((team_id, user_id)): Path<(String, String)>,
+    Extension(pool): Extension<PgPool>,
+) -> Result<StatusCode, ApiError> {
+    let id: TeamId = team_id.parse()?;
+    let member_user_id: UserId = user_id.parse()?;
+
+    // Check permission
+    if !current_user.has_role("admin") {
+        let permission_service = PermissionService::new(pool.clone());
+        let is_leader = permission_service
+            .check_team_leadership_cascade(&current_user.user_id, &id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+        if !is_leader {
+            return Err(ApiError::Forbidden {
+                permission: format!("team:lead({}) or role:admin", id),
+            });
+        }
+    }
+
+    let repo = PgTeamRepository::new(pool);
+
+    // Prevent removing last leader
+    let members = repo
+        .list_members(&id, Pagination::default())
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+
+    let leader_count = members
+        .items
+        .iter()
+        .filter(|m| m.role == TeamRole::Leader)
+        .count();
+
+    let is_removing_leader = members
+        .items
+        .iter()
+        .any(|m| m.user_id == member_user_id && m.role == TeamRole::Leader);
+
+    if is_removing_leader && leader_count <= 1 {
+        return Err(ApiError::bad_request(
+            "team.last_leader",
+            "Cannot remove the last leader. Promote another member to leader first.",
+        ));
+    }
+
+    repo.remove_member(&id, &member_user_id)
+        .await
+        .map_err(|e| match e {
+            TeamMembershipError::NotAMember => {
+                ApiError::not_found("team_member", format!("{}:{}", team_id, user_id))
+            }
+            TeamMembershipError::AlreadyMember => {
+                ApiError::Internal(anyhow::anyhow!("Unexpected error"))
+            }
+            TeamMembershipError::Database(e) => ApiError::Internal(anyhow::anyhow!("{}", e)),
+            TeamMembershipError::TeamNotFound(id) => ApiError::not_found("team", id.to_string()),
+            TeamMembershipError::UserNotFound(id) => ApiError::not_found("user", id.to_string()),
+        })?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Update a team member's role or allocation
+#[utoipa::path(
+    patch,
+    path = "/teams/{team_id}/members/{user_id}",
+    tag = "teams",
+    params(
+        ("team_id" = String, Path, description = "Team ID"),
+        ("user_id" = String, Path, description = "User ID to update")
+    ),
+    request_body = UpdateMemberRequest,
+    responses(
+        (status = 200, description = "Member updated", body = TeamMemberResponse),
+        (status = 400, description = "Cannot demote last leader"),
+        (status = 403, description = "Requires team leadership"),
+        (status = 404, description = "Member not found")
+    )
+)]
+pub async fn update_team_member(
+    current_user: CurrentUser,
+    Path((team_id, user_id)): Path<(String, String)>,
+    Extension(pool): Extension<PgPool>,
+    Json(body): Json<UpdateMemberRequest>,
+) -> Result<Json<TeamMemberResponse>, ApiError> {
+    let id: TeamId = team_id.parse()?;
+    let member_user_id: UserId = user_id.parse()?;
+
+    // Check permission
+    if !current_user.has_role("admin") {
+        let permission_service = PermissionService::new(pool.clone());
+        let is_leader = permission_service
+            .check_team_leadership_cascade(&current_user.user_id, &id)
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+        if !is_leader {
+            return Err(ApiError::Forbidden {
+                permission: format!("team:lead({}) or role:admin", id),
+            });
+        }
+    }
+
+    let new_role = body
+        .role
+        .as_ref()
+        .map(|r| match r.as_str() {
+            "leader" => Ok(TeamRole::Leader),
+            "member" => Ok(TeamRole::Member),
+            _ => Err(ApiError::bad_request(
+                "team.role.invalid",
+                format!("Invalid role: {}", r),
+            )),
+        })
+        .transpose()?;
+
+    let repo = PgTeamRepository::new(pool.clone());
+
+    // If demoting from leader, check not last leader
+    if new_role == Some(TeamRole::Member) {
+        let members = repo
+            .list_members(&id, Pagination::default())
+            .await
+            .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+
+        let current_member = members.items.iter().find(|m| m.user_id == member_user_id);
+
+        if let Some(m) = current_member {
+            if m.role == TeamRole::Leader {
+                let leader_count = members
+                    .items
+                    .iter()
+                    .filter(|m| m.role == TeamRole::Leader)
+                    .count();
+
+                if leader_count <= 1 {
+                    return Err(ApiError::bad_request(
+                        "team.last_leader",
+                        "Cannot demote the last leader. Promote another member to leader first.",
+                    ));
+                }
+            }
+        }
+    }
+
+    let membership = repo
+        .update_member(&id, &member_user_id, new_role, body.allocation_percentage)
+        .await
+        .map_err(|e| match e {
+            TeamMembershipError::NotAMember => {
+                ApiError::not_found("team_member", format!("{}:{}", team_id, user_id))
+            }
+            TeamMembershipError::AlreadyMember => {
+                ApiError::Internal(anyhow::anyhow!("Unexpected error"))
+            }
+            TeamMembershipError::Database(e) => ApiError::Internal(anyhow::anyhow!("{}", e)),
+            TeamMembershipError::TeamNotFound(id) => ApiError::not_found("team", id.to_string()),
+            TeamMembershipError::UserNotFound(id) => ApiError::not_found("user", id.to_string()),
+        })?;
+
+    // Get user details for response
+    let user_repo = PgUserRepository::new(pool);
+    let user = user_repo
+        .find_by_id(&member_user_id)
+        .await
+        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?
+        .ok_or_else(|| ApiError::Internal(anyhow::anyhow!("User not found")))?;
+
+    Ok(Json(TeamMemberResponse {
+        user_id: membership.user_id.to_string(),
+        display_name: user.display_name,
+        email: user.email,
+        role: format!("{:?}", membership.role).to_lowercase(),
+        joined_at: membership.joined_at.to_rfc3339(),
+        allocation_percentage: membership.allocation_percentage,
+    }))
+}
+
+// =============================================================================
 // Routes
 // =============================================================================
 
@@ -463,4 +853,14 @@ pub fn routes() -> axum::Router {
             get(get_team).patch(update_team).delete(delete_team),
         )
         .route("/{team_id}/tree", get(get_team_tree))
+        .route(
+            "/{team_id}/members",
+            get(list_team_members).post(add_team_member),
+        )
+        .route(
+            "/{team_id}/members/{user_id}",
+            get(list_team_members)
+                .patch(update_team_member)
+                .delete(remove_team_member),
+        )
 }
