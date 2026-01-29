@@ -1,75 +1,74 @@
 ---
 status: testing
 phase: 04-user-team-management
-source: 04-03-SUMMARY.md, 04-04-SUMMARY.md, 04-05-SUMMARY.md, 04-06-SUMMARY.md, 04-07-SUMMARY.md, 04-08-SUMMARY.md, 04-09-SUMMARY.md
-started: 2026-01-29T12:30:00Z
-updated: 2026-01-29T12:30:00Z
+source: 04-01-SUMMARY.md, 04-02-SUMMARY.md, 04-03-SUMMARY.md, 04-04-SUMMARY.md, 04-05-SUMMARY.md, 04-06-SUMMARY.md, 04-07-SUMMARY.md, 04-08-SUMMARY.md, 04-09-SUMMARY.md
+started: 2026-01-29T05:20:00Z
+updated: 2026-01-29T05:20:00Z
 ---
 
 ## Current Test
 
 number: 1
-name: User Profile Page Loads
+name: View User Profile Page
 expected: |
-  Navigate to /users/{userId}. Page displays user's display name, email, department, bio, and timezone. Skills section shows skill badges with color-coded status. Quality stats section shows accuracy, speed, consistency metrics.
+  Navigate to http://localhost:5173/users/user_b2c3d4e5-f6a7-8901-bcde-f12345678901
+  Page displays Bob's profile with display name, email, department, and bio.
 awaiting: user response
+
+## Pre-UAT Fixes Applied
+
+- Fixed UUID to String conversion in pg_user.rs (added ::text casts)
+- Added 'deleted' to user_status enum (migration 0010)
+- Fixed team_role enum casting in pg_team.rs (added ::text casts)
 
 ## Tests
 
-### 1. User Profile Page Loads
-expected: Navigate to /users/{userId}. Page displays user's display name, email, department, bio, and timezone. Skills section shows skill badges with color-coded status. Quality stats section shows accuracy, speed, consistency metrics.
+### 1. View User Profile Page
+expected: Navigate to /users/user_b2c3d4e5-f6a7-8901-bcde-f12345678901 - shows user profile with name, email, department, bio
 result: [pending]
 
-### 2. Edit Own Profile
-expected: On your own profile page, click Edit. Form allows changing display name, bio, and contact info. Save persists changes and shows updated values.
+### 2. View User Skills on Profile
+expected: User profile page shows skills section (may be empty if no skills assigned)
 result: [pending]
 
-### 3. Admin Users Page Lists Users
-expected: Navigate to /admin/users. Data table shows paginated user list with columns: name, email, status, role. Pagination controls work. Sort by clicking column headers.
+### 3. View Quality Stats on Profile
+expected: Profile shows quality metrics section with overall score, accuracy, speed, consistency
 result: [pending]
 
-### 4. Admin Create User
-expected: On admin users page, click Create User. Modal form allows entering email, display name, department. Submit creates user and shows in table.
+### 4. Navigate to Admin Users Page
+expected: Go to http://localhost:5173/admin/users - shows table of all users with columns for name, email, status, role
 result: [pending]
 
-### 5. Admin Bulk Status Change
-expected: On admin users page, select multiple users via checkboxes. Bulk Actions shows with Activate/Deactivate options. Selecting action updates all selected users.
+### 5. User Table Sorting
+expected: Click column headers in admin users table to sort by that column
 result: [pending]
 
-### 6. Teams Page Lists Teams
-expected: Navigate to /teams. Page shows list of root-level teams with name, description, member count. Click a team to navigate to detail.
+### 6. User Table Pagination
+expected: If more than default page size, pagination controls appear at bottom of table
 result: [pending]
 
-### 7. Team Detail Shows Members
-expected: On team detail page (/teams/{teamId}), see team name, description, stats. Members list shows users with role badges (Leader/Member). Sub-teams section shows child teams if any.
+### 7. Navigate to Teams Page
+expected: Go to http://localhost:5173/teams - shows list/tree of teams
 result: [pending]
 
-### 8. Team Hierarchy Tree
-expected: On team detail page with sub-teams, hierarchy tree component displays nested structure. Nodes are expandable/collapsible. Clicking a team navigates to its detail.
+### 8. View Team Detail Page
+expected: Click a team to see team detail page with team info and member list
 result: [pending]
 
-### 9. Add Member to Team
-expected: On team detail page (as team leader or admin), click Add Member. Modal shows user search. Select user and role. Submit adds member to team and updates member list.
+### 9. Team Hierarchy Display
+expected: Teams page shows parent-child relationships (tree structure or indentation)
 result: [pending]
 
-### 10. Promote/Demote Team Member
-expected: On team detail page, member list shows action buttons for leaders. Can promote member to leader, or demote leader to member. Action updates role badge immediately.
-result: [pending]
-
-### 11. Remove Team Member
-expected: On team detail page, click remove on a member. Confirmation shown. After confirm, member removed from list. (Cannot remove last leader)
-result: [pending]
-
-### 12. Skill Badges Status Colors
-expected: On user profile with skills, badges show status colors: green for active, yellow for expiring soon, red for expired. Hover or click shows skill details.
+### 10. View Team Members
+expected: Team detail page lists members with their roles (leader/member)
 result: [pending]
 
 ## Summary
 
-total: 12
+total: 10
 passed: 0
 issues: 0
-pending: 12
+pending: 10
 skipped: 0
 
 ## Gaps

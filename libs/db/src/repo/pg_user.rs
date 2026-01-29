@@ -5,7 +5,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use glyph_domain::{GlobalRole, QualityProfile, User, UserId, UserStatus};
+use glyph_domain::{GlobalRole, IdParseError, QualityProfile, User, UserId, UserStatus};
 
 use crate::audit::{AuditAction, AuditActorType, AuditEvent, AuditWriter, SYSTEM_ACTOR_ID};
 use crate::pagination::{Page, Pagination};
@@ -31,7 +31,7 @@ impl UserRepository for PgUserRepository {
     async fn find_by_id(&self, id: &UserId) -> Result<Option<User>, FindUserError> {
         let row = sqlx::query_as::<_, UserRow>(
             r#"
-            SELECT user_id, auth0_id, email, display_name, status,
+            SELECT user_id::text, auth0_id, email, display_name, status::text,
                    timezone, department, bio, avatar_url, contact_info, global_role,
                    skills, roles, quality_profile, created_at, updated_at
             FROM users
@@ -51,7 +51,7 @@ impl UserRepository for PgUserRepository {
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, FindUserError> {
         let row = sqlx::query_as::<_, UserRow>(
             r#"
-            SELECT user_id, auth0_id, email, display_name, status,
+            SELECT user_id::text, auth0_id, email, display_name, status::text,
                    timezone, department, bio, avatar_url, contact_info, global_role,
                    skills, roles, quality_profile, created_at, updated_at
             FROM users
@@ -71,7 +71,7 @@ impl UserRepository for PgUserRepository {
     async fn find_by_auth0_id(&self, auth0_id: &str) -> Result<Option<User>, FindUserError> {
         let row = sqlx::query_as::<_, UserRow>(
             r#"
-            SELECT user_id, auth0_id, email, display_name, status,
+            SELECT user_id::text, auth0_id, email, display_name, status::text,
                    timezone, department, bio, avatar_url, contact_info, global_role,
                    skills, roles, quality_profile, created_at, updated_at
             FROM users
@@ -111,7 +111,7 @@ impl UserRepository for PgUserRepository {
             r#"
             INSERT INTO users (user_id, auth0_id, email, display_name, timezone, department, global_role)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
-            RETURNING user_id, auth0_id, email, display_name, status,
+            RETURNING user_id::text, auth0_id, email, display_name, status::text,
                       timezone, department, bio, avatar_url, contact_info, global_role,
                       skills, roles, quality_profile, created_at, updated_at
             "#,
@@ -175,7 +175,7 @@ impl UserRepository for PgUserRepository {
                 global_role = COALESCE($9, global_role),
                 updated_at = NOW()
             WHERE user_id = $1 AND status != 'deleted'
-            RETURNING user_id, auth0_id, email, display_name, status,
+            RETURNING user_id::text, auth0_id, email, display_name, status::text,
                       timezone, department, bio, avatar_url, contact_info, global_role,
                       skills, roles, quality_profile, created_at, updated_at
             "#,
@@ -232,7 +232,7 @@ impl UserRepository for PgUserRepository {
 
         let rows = sqlx::query_as::<_, UserRow>(
             r#"
-            SELECT user_id, auth0_id, email, display_name, status,
+            SELECT user_id::text, auth0_id, email, display_name, status::text,
                    timezone, department, bio, avatar_url, contact_info, global_role,
                    skills, roles, quality_profile, created_at, updated_at
             FROM users
@@ -308,8 +308,13 @@ impl TryFrom<UserRow> for User {
     type Error = glyph_domain::IdParseError;
 
     fn try_from(row: UserRow) -> Result<Self, Self::Error> {
+        // Database stores raw UUID, need to parse and wrap with UserId
+        let uuid: uuid::Uuid = row
+            .user_id
+            .parse()
+            .map_err(|e: uuid::Error| IdParseError::InvalidUuid(e.to_string()))?;
         Ok(User {
-            user_id: row.user_id.parse()?,
+            user_id: UserId::from_uuid(uuid),
             auth0_id: row.auth0_id,
             email: row.email,
             display_name: row.display_name,

@@ -260,18 +260,24 @@ pub async fn get_team(
     let team = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?
+        .map_err(|e| {
+            tracing::error!("Failed to find team {}: {:?}", team_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
         .ok_or_else(|| ApiError::not_found("team", team_id.clone()))?;
 
-    let sub_teams = repo
-        .get_sub_teams(&id)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+    let sub_teams = repo.get_sub_teams(&id).await.map_err(|e| {
+        tracing::error!("Failed to get sub_teams for {}: {:?}", team_id, e);
+        ApiError::Internal(anyhow::anyhow!("{}", e))
+    })?;
 
     let members = repo
         .list_members(&id, Pagination::default())
         .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+        .map_err(|e| {
+            tracing::error!("Failed to list members for {}: {:?}", team_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?;
 
     let leader_count = members
         .items

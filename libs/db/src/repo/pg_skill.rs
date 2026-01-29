@@ -206,7 +206,14 @@ impl SkillRepository for PgSkillRepository {
         user_id: &UserId,
     ) -> Result<Vec<UserSkillWithStatus>, sqlx::Error> {
         let rows = sqlx::query_as::<_, UserSkillRow>(
-            "SELECT * FROM user_skills_with_status WHERE user_id = $1 ORDER BY skill_name",
+            r#"
+            SELECT certification_id::text, user_id::text, skill_id, proficiency_level,
+                   certified_by::text, certified_at, expires_at, notes, skill_name,
+                   grace_period_days, status
+            FROM user_skills_with_status
+            WHERE user_id = $1
+            ORDER BY skill_name
+            "#,
         )
         .bind(user_id.as_uuid())
         .fetch_all(&self.pool)
@@ -221,7 +228,13 @@ impl SkillRepository for PgSkillRepository {
         skill_id: &str,
     ) -> Result<Option<UserSkillWithStatus>, sqlx::Error> {
         let row = sqlx::query_as::<_, UserSkillRow>(
-            "SELECT * FROM user_skills_with_status WHERE user_id = $1 AND skill_id = $2",
+            r#"
+            SELECT certification_id::text, user_id::text, skill_id, proficiency_level,
+                   certified_by::text, certified_at, expires_at, notes, skill_name,
+                   grace_period_days, status
+            FROM user_skills_with_status
+            WHERE user_id = $1 AND skill_id = $2
+            "#,
         )
         .bind(user_id.as_uuid())
         .bind(skill_id)

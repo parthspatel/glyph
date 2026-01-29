@@ -192,8 +192,11 @@ pub async fn get_user(
     let user = repo
         .find_by_id(&id)
         .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?
-        .ok_or_else(|| ApiError::not_found("user", user_id))?;
+        .map_err(|e| {
+            tracing::error!("Failed to find user {}: {:?}", user_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
+        .ok_or_else(|| ApiError::not_found("user", user_id.clone()))?;
 
     Ok(Json(UserDetailResponse::from(user)))
 }

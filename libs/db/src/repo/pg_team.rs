@@ -228,7 +228,7 @@ impl TeamRepository for PgTeamRepository {
             r#"
             INSERT INTO team_memberships (team_id, user_id, role, allocation_percentage)
             VALUES ($1, $2, $3, $4)
-            RETURNING team_id, user_id, role, allocation_percentage, joined_at
+            RETURNING team_id, user_id, role::text, allocation_percentage, joined_at
             "#,
         )
         .bind(team_id.as_uuid())
@@ -282,7 +282,7 @@ impl TeamRepository for PgTeamRepository {
                 role = COALESCE($3, role),
                 allocation_percentage = COALESCE($4, allocation_percentage)
             WHERE team_id = $1 AND user_id = $2
-            RETURNING team_id, user_id, role, allocation_percentage, joined_at
+            RETURNING team_id, user_id, role::text, allocation_percentage, joined_at
             "#,
         )
         .bind(team_id.as_uuid())
@@ -312,7 +312,7 @@ impl TeamRepository for PgTeamRepository {
 
         let rows = sqlx::query_as::<_, TeamMemberWithUserRow>(
             r#"
-            SELECT tm.team_id, tm.user_id, tm.role, tm.allocation_percentage, tm.joined_at,
+            SELECT tm.team_id, tm.user_id, tm.role::text, tm.allocation_percentage, tm.joined_at,
                    u.display_name, u.email
             FROM team_memberships tm
             JOIN users u ON tm.user_id = u.user_id
