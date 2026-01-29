@@ -8,3 +8,6 @@ export { BulkActions } from "./BulkActions";
 export { ProjectForm, type ProjectFormData } from "./ProjectForm";
 export { ProjectChecklist } from "./ProjectChecklist";
 export { SchemaEditor } from "./SchemaEditor";
+export { ProjectOverview } from "./ProjectOverview";
+export { ProjectActivity } from "./ProjectActivity";
+export { StatusTransitionDialog } from "./StatusTransitionDialog";
