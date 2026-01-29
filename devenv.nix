@@ -97,22 +97,31 @@
     '';
 
     dev.exec = ''
-      set -m  # Enable job control, creates new process group
+      API_PID=""
+      WEB_PID=""
 
       cleanup() {
         echo ""
         echo "Shutting down..."
-        kill $(jobs -p) 2>/dev/null
-        wait
+        [[ -n "$API_PID" ]] && kill "$API_PID" 2>/dev/null
+        [[ -n "$WEB_PID" ]] && kill "$WEB_PID" 2>/dev/null
+        # Kill any child processes that might have spawned
+        pkill -f "glyph-api" 2>/dev/null
+        pkill -f "@glyph/web" 2>/dev/null
+        exit 0
       }
-      trap cleanup EXIT INT TERM
+
+      trap cleanup INT TERM
 
       echo "Starting development servers..."
       echo "API: http://localhost:3000"
       echo "Web: http://localhost:5173"
 
       cargo run --package glyph-api &
+      API_PID=$!
+
       pnpm --filter @glyph/web dev &
+      WEB_PID=$!
 
       wait
     '';
