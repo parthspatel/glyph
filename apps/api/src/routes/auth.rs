@@ -11,6 +11,7 @@ use std::sync::Arc;
 
 use axum::{
     extract::{Query, State},
+    http::HeaderMap,
     response::{IntoResponse, Redirect},
     routing::{get, post},
     Json, Router,
@@ -20,11 +21,13 @@ use serde::{Deserialize, Serialize};
 use tracing::{debug, info, warn};
 
 use glyph_auth::{
-    clear_auth_cookies, clear_pkce_cookie, cookie_time, parse_pkce_cookie, set_auth_cookies,
-    set_pkce_cookie, Auth0Client, Auth0Config, Cookie, JwksCache, SameSite, PKCE_STATE_COOKIE,
+    clear_auth_cookies, clear_pkce_cookie, cookie_time, emit_audit_event, parse_pkce_cookie,
+    set_auth_cookies, set_pkce_cookie, AuditEvent, AuditEventType, Auth0Client, Auth0Config,
+    Cookie, JwksCache, SameSite, PKCE_STATE_COOKIE,
 };
 
 use crate::extractors::CurrentUser;
+use crate::middleware::AuditContext;
 use crate::ApiError;
 
 /// Shared authentication state.
@@ -79,9 +82,22 @@ pub fn routes() -> Router<AuthState> {
 async fn login(
     State(auth): State<AuthState>,
     Query(query): Query<LoginQuery>,
+    headers: HeaderMap,
     jar: CookieJar,
 ) -> impl IntoResponse {
+    let audit_ctx = AuditContext::from_headers(&headers);
     info!("initiating login flow");
+
+    // Emit audit event for login initiation
+    emit_audit_event(
+        AuditEvent::new(
+            AuditEventType::Login,
+            &audit_ctx.request_id,
+            "/api/auth/login",
+        )
+        .with_ip(audit_ctx.ip_address.clone().unwrap_or_default())
+        .with_user_agent(audit_ctx.user_agent.clone().unwrap_or_default()),
+    );
 
     // Generate authorization URL with PKCE
     let auth_data = auth.auth0_client.authorize_url();
@@ -122,25 +138,57 @@ async fn login(
 async fn callback(
     State(auth): State<AuthState>,
     Query(query): Query<CallbackQuery>,
+    headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<impl IntoResponse, ApiError> {
+    let audit_ctx = AuditContext::from_headers(&headers);
     info!("processing OAuth callback");
 
     // Get PKCE state from cookie
     let pkce_cookie = jar.get(PKCE_STATE_COOKIE).ok_or_else(|| {
         warn!("PKCE cookie missing");
+        emit_audit_event(
+            AuditEvent::new(
+                AuditEventType::LoginFailed,
+                &audit_ctx.request_id,
+                "/api/auth/callback",
+            )
+            .with_failure("pkce_cookie_missing")
+            .with_ip(audit_ctx.ip_address.clone().unwrap_or_default())
+            .with_user_agent(audit_ctx.user_agent.clone().unwrap_or_default()),
+        );
         ApiError::bad_request("auth.invalid_state", "Missing PKCE state")
     })?;
 
     let (csrf_token, nonce, pkce_verifier) =
         parse_pkce_cookie(pkce_cookie.value()).ok_or_else(|| {
             warn!("PKCE cookie malformed");
+            emit_audit_event(
+                AuditEvent::new(
+                    AuditEventType::LoginFailed,
+                    &audit_ctx.request_id,
+                    "/api/auth/callback",
+                )
+                .with_failure("pkce_cookie_malformed")
+                .with_ip(audit_ctx.ip_address.clone().unwrap_or_default())
+                .with_user_agent(audit_ctx.user_agent.clone().unwrap_or_default()),
+            );
             ApiError::bad_request("auth.invalid_state", "Invalid PKCE state")
         })?;
 
     // Verify CSRF state
     if query.state != csrf_token {
         warn!(expected = %csrf_token, got = %query.state, "CSRF state mismatch");
+        emit_audit_event(
+            AuditEvent::new(
+                AuditEventType::LoginFailed,
+                &audit_ctx.request_id,
+                "/api/auth/callback",
+            )
+            .with_failure("csrf_state_mismatch")
+            .with_ip(audit_ctx.ip_address.clone().unwrap_or_default())
+            .with_user_agent(audit_ctx.user_agent.clone().unwrap_or_default()),
+        );
         return Err(ApiError::bad_request(
             "auth.invalid_state",
             "State mismatch",
@@ -154,10 +202,31 @@ async fn callback(
         .await
         .map_err(|e| {
             warn!(error = %e, "token exchange failed");
+            emit_audit_event(
+                AuditEvent::new(
+                    AuditEventType::LoginFailed,
+                    &audit_ctx.request_id,
+                    "/api/auth/callback",
+                )
+                .with_failure("token_exchange_failed")
+                .with_ip(audit_ctx.ip_address.clone().unwrap_or_default())
+                .with_user_agent(audit_ctx.user_agent.clone().unwrap_or_default()),
+            );
             ApiError::bad_request("auth.token_exchange_failed", "Failed to exchange code")
         })?;
 
     info!("token exchange successful");
+
+    // Emit successful session creation event
+    emit_audit_event(
+        AuditEvent::new(
+            AuditEventType::SessionCreated,
+            &audit_ctx.request_id,
+            "/api/auth/callback",
+        )
+        .with_ip(audit_ctx.ip_address.unwrap_or_default())
+        .with_user_agent(audit_ctx.user_agent.unwrap_or_default()),
+    );
 
     // Get redirect URL from cookie BEFORE consuming jar (or default to /)
     let redirect_to = jar
@@ -190,8 +259,24 @@ async fn callback(
 /// POST /api/auth/logout
 ///
 /// Clears cookies and returns Auth0 logout URL.
-async fn logout(State(auth): State<AuthState>, jar: CookieJar) -> impl IntoResponse {
+async fn logout(
+    State(auth): State<AuthState>,
+    headers: HeaderMap,
+    jar: CookieJar,
+) -> impl IntoResponse {
+    let audit_ctx = AuditContext::from_headers(&headers);
     info!("processing logout");
+
+    // Emit logout audit event
+    emit_audit_event(
+        AuditEvent::new(
+            AuditEventType::Logout,
+            &audit_ctx.request_id,
+            "/api/auth/logout",
+        )
+        .with_ip(audit_ctx.ip_address.unwrap_or_default())
+        .with_user_agent(audit_ctx.user_agent.unwrap_or_default()),
+    );
 
     // Clear auth cookies
     let (access_cookie, refresh_cookie) = clear_auth_cookies();
@@ -218,14 +303,28 @@ async fn logout(State(auth): State<AuthState>, jar: CookieJar) -> impl IntoRespo
 /// Refreshes access token using refresh token cookie.
 async fn refresh(
     State(auth): State<AuthState>,
+    headers: HeaderMap,
     jar: CookieJar,
 ) -> Result<impl IntoResponse, ApiError> {
+    let audit_ctx = AuditContext::from_headers(&headers);
     debug!("processing token refresh");
 
     // Get refresh token from cookie (only sent to this path)
     let refresh_token = jar
         .get(glyph_auth::REFRESH_TOKEN_COOKIE)
-        .ok_or(ApiError::Unauthorized)?
+        .ok_or_else(|| {
+            emit_audit_event(
+                AuditEvent::new(
+                    AuditEventType::TokenRefreshFailed,
+                    &audit_ctx.request_id,
+                    "/api/auth/refresh",
+                )
+                .with_failure("refresh_token_missing")
+                .with_ip(audit_ctx.ip_address.clone().unwrap_or_default())
+                .with_user_agent(audit_ctx.user_agent.clone().unwrap_or_default()),
+            );
+            ApiError::Unauthorized
+        })?
         .value()
         .to_string();
 
@@ -236,10 +335,31 @@ async fn refresh(
         .await
         .map_err(|e| {
             warn!(error = %e, "token refresh failed");
+            emit_audit_event(
+                AuditEvent::new(
+                    AuditEventType::TokenRefreshFailed,
+                    &audit_ctx.request_id,
+                    "/api/auth/refresh",
+                )
+                .with_failure("refresh_failed")
+                .with_ip(audit_ctx.ip_address.clone().unwrap_or_default())
+                .with_user_agent(audit_ctx.user_agent.clone().unwrap_or_default()),
+            );
             ApiError::Unauthorized
         })?;
 
     info!("token refresh successful");
+
+    // Emit successful token refresh event
+    emit_audit_event(
+        AuditEvent::new(
+            AuditEventType::TokenRefresh,
+            &audit_ctx.request_id,
+            "/api/auth/refresh",
+        )
+        .with_ip(audit_ctx.ip_address.unwrap_or_default())
+        .with_user_agent(audit_ctx.user_agent.unwrap_or_default()),
+    );
 
     // Set new auth cookies
     let (access_cookie, refresh_cookie) =

@@ -16,6 +16,7 @@
 //! println!("Issuer: {}", config.issuer());
 //! ```
 
+pub mod audit;
 pub mod config;
 pub mod error;
 pub mod jwks;
@@ -38,5 +39,5 @@ pub use tokens::{
 pub use cookie::time as cookie_time;
 pub use cookie::{Cookie, SameSite};
 
-// Modules to be added in subsequent plans:
-// pub mod audit;   // 03-06: Audit logging
+// Audit logging
+pub use audit::{emit_audit_event, AuditEvent, AuditEventType};
