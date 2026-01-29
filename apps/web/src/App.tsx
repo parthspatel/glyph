@@ -3,6 +3,8 @@ import { Routes, Route } from "react-router-dom";
 // Pages
 import { HomePage } from "./pages/HomePage";
 import { ProjectsPage } from "./pages/ProjectsPage";
+import { ProjectCreatePage } from "./pages/ProjectCreatePage";
+import { ProjectEditPage } from "./pages/ProjectEditPage";
 import { TasksPage } from "./pages/TasksPage";
 import { AnnotatePage } from "./pages/AnnotatePage";
 import { UserProfilePage } from "./pages/UserProfilePage";
@@ -16,6 +18,8 @@ export function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/projects" element={<ProjectsPage />} />
+        <Route path="/projects/new" element={<ProjectCreatePage />} />
+        <Route path="/projects/:projectId/edit" element={<ProjectEditPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/annotate/:taskId" element={<AnnotatePage />} />
         <Route path="/users/:userId" element={<UserProfilePage />} />
