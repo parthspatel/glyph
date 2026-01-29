@@ -6,6 +6,7 @@ mod health;
 mod projects;
 mod skills;
 mod tasks;
+mod teams;
 mod users;
 mod workflows;
 
@@ -26,6 +27,7 @@ fn api_v1_routes() -> Router {
         .nest("/users", users::routes())
         .nest("/users/{user_id}/skills", skills::user_skill_routes())
         .nest("/skills/types", skills::skill_type_routes())
+        .nest("/teams", teams::routes())
         .nest("/tasks", tasks::routes())
         .nest("/annotations", annotations::routes())
         .nest("/projects", projects::routes())

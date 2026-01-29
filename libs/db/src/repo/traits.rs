@@ -48,9 +48,10 @@ pub struct UserUpdate {
 pub struct NewTeam {
     pub name: String,
     pub description: Option<String>,
-    pub leader_id: UserId,
+    pub parent_team_id: Option<TeamId>,
     pub capacity: Option<i32>,
     pub specializations: Vec<String>,
+    pub initial_leader_id: Option<UserId>,
 }
 
 /// Input for updating a team
@@ -58,9 +59,30 @@ pub struct NewTeam {
 pub struct TeamUpdate {
     pub name: Option<String>,
     pub description: Option<String>,
-    pub leader_id: Option<UserId>,
     pub status: Option<TeamStatus>,
     pub capacity: Option<i32>,
+    pub specializations: Option<Vec<String>>,
+}
+
+/// Team node in hierarchy tree
+#[derive(Debug, Clone)]
+pub struct TeamTreeNode {
+    pub team: Team,
+    pub depth: i32,
+    pub member_count: i64,
+    pub sub_team_count: i64,
+}
+
+/// Team membership with user details
+#[derive(Debug, Clone)]
+pub struct TeamMembershipWithUser {
+    pub team_id: TeamId,
+    pub user_id: UserId,
+    pub role: TeamRole,
+    pub allocation_percentage: Option<i32>,
+    pub joined_at: chrono::DateTime<chrono::Utc>,
+    pub display_name: String,
+    pub email: String,
 }
 
 /// Input for creating a new project
@@ -160,12 +182,22 @@ pub trait TeamRepository: Send + Sync {
     /// List teams with pagination
     async fn list(&self, pagination: Pagination) -> Result<Page<Team>, sqlx::Error>;
 
+    /// List root teams (no parent) with pagination
+    async fn list_root_teams(&self, pagination: Pagination) -> Result<Page<Team>, sqlx::Error>;
+
+    /// Get direct sub-teams of a team
+    async fn get_sub_teams(&self, team_id: &TeamId) -> Result<Vec<Team>, FindTeamError>;
+
+    /// Get team hierarchy tree (recursive)
+    async fn get_team_tree(&self, team_id: &TeamId) -> Result<Vec<TeamTreeNode>, FindTeamError>;
+
     /// Add a member to a team
     async fn add_member(
         &self,
         team_id: &TeamId,
         user_id: &UserId,
         role: TeamRole,
+        allocation: Option<i32>,
     ) -> Result<TeamMembership, TeamMembershipError>;
 
     /// Remove a member from a team
@@ -175,12 +207,24 @@ pub trait TeamRepository: Send + Sync {
         user_id: &UserId,
     ) -> Result<(), TeamMembershipError>;
 
-    /// List team members
+    /// Update a team member's role or allocation
+    async fn update_member(
+        &self,
+        team_id: &TeamId,
+        user_id: &UserId,
+        role: Option<TeamRole>,
+        allocation: Option<i32>,
+    ) -> Result<TeamMembership, TeamMembershipError>;
+
+    /// List team members with user details
     async fn list_members(
         &self,
         team_id: &TeamId,
         pagination: Pagination,
-    ) -> Result<Page<TeamMembership>, FindTeamError>;
+    ) -> Result<Page<TeamMembershipWithUser>, FindTeamError>;
+
+    /// Get member count for a team
+    async fn get_member_count(&self, team_id: &TeamId) -> Result<i64, sqlx::Error>;
 
     /// Soft delete a team
     async fn soft_delete(&self, id: &TeamId) -> Result<(), UpdateTeamError>;

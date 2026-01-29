@@ -6,75 +6,12 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use glyph_domain::{Annotation, Project, Task, Team, TeamMembership, TeamRole, Workflow};
-use glyph_domain::{AnnotationId, ProjectId, TaskId, TeamId, WorkflowId};
+use glyph_domain::{Annotation, Project, Task, Workflow};
+use glyph_domain::{AnnotationId, ProjectId, TaskId, WorkflowId};
 
 use crate::pagination::{Page, Pagination};
 use crate::repo::errors::*;
 use crate::repo::traits::*;
-
-// =============================================================================
-// Team Repository Stub
-// =============================================================================
-
-pub struct PgTeamRepository {
-    #[allow(dead_code)]
-    pool: PgPool,
-}
-
-impl PgTeamRepository {
-    pub fn new(pool: PgPool) -> Self {
-        Self { pool }
-    }
-}
-
-#[async_trait]
-impl TeamRepository for PgTeamRepository {
-    async fn find_by_id(&self, _id: &TeamId) -> Result<Option<Team>, FindTeamError> {
-        todo!("Implement in Phase 4")
-    }
-
-    async fn create(&self, _team: &NewTeam) -> Result<Team, CreateTeamError> {
-        todo!("Implement in Phase 4")
-    }
-
-    async fn update(&self, _id: &TeamId, _update: &TeamUpdate) -> Result<Team, UpdateTeamError> {
-        todo!("Implement in Phase 4")
-    }
-
-    async fn list(&self, _pagination: Pagination) -> Result<Page<Team>, sqlx::Error> {
-        todo!("Implement in Phase 4")
-    }
-
-    async fn add_member(
-        &self,
-        _team_id: &TeamId,
-        _user_id: &glyph_domain::UserId,
-        _role: TeamRole,
-    ) -> Result<TeamMembership, TeamMembershipError> {
-        todo!("Implement in Phase 4")
-    }
-
-    async fn remove_member(
-        &self,
-        _team_id: &TeamId,
-        _user_id: &glyph_domain::UserId,
-    ) -> Result<(), TeamMembershipError> {
-        todo!("Implement in Phase 4")
-    }
-
-    async fn list_members(
-        &self,
-        _team_id: &TeamId,
-        _pagination: Pagination,
-    ) -> Result<Page<TeamMembership>, FindTeamError> {
-        todo!("Implement in Phase 4")
-    }
-
-    async fn soft_delete(&self, _id: &TeamId) -> Result<(), UpdateTeamError> {
-        todo!("Implement in Phase 4")
-    }
-}
 
 // =============================================================================
 // Project Repository Stub

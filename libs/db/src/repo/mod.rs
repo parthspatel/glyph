@@ -5,11 +5,13 @@
 pub mod errors;
 pub mod pg_skill;
 pub mod pg_stubs;
+pub mod pg_team;
 pub mod pg_user;
 pub mod traits;
 
 pub use errors::*;
 pub use pg_skill::*;
 pub use pg_stubs::*;
+pub use pg_team::*;
 pub use pg_user::*;
 pub use traits::*;
