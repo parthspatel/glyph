@@ -5,14 +5,19 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use axum::{Extension, Router};
+use sqlx::postgres::PgPoolOptions;
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
 
-use glyph_api::{extractors::AuthState as ExtractorAuthState, routes, ApiDoc};
+use glyph_api::{
+    extractors::{AuthState as ExtractorAuthState, DevMode},
+    routes, ApiDoc,
+};
 use glyph_auth::{Auth0Client, Auth0Config, JwksCache};
+use glyph_domain::UserId;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -28,6 +33,17 @@ async fn main() -> Result<()> {
     // Load environment variables
     dotenvy::dotenv().ok();
 
+    // Initialize database connection pool
+    let database_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://glyph:glyph@localhost:5432/glyph".to_string());
+
+    let pool = PgPoolOptions::new()
+        .max_connections(10)
+        .connect(&database_url)
+        .await?;
+
+    tracing::info!("Connected to database");
+
     // Initialize authentication (optional - skip if Auth0 not configured)
     let auth_state = init_auth().await;
 
@@ -39,6 +55,7 @@ async fn main() -> Result<()> {
     let mut app = Router::new()
         .merge(routes::api_routes())
         .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", openapi))
+        .layer(Extension(pool))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive());
 
@@ -56,8 +73,15 @@ async fn main() -> Result<()> {
             .nest("/api/auth", routes::auth_routes(state))
             .layer(Extension(extractor_state));
     } else {
-        tracing::warn!("Auth0 not configured - authentication routes disabled");
-        tracing::warn!("Set AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_API_IDENTIFIER, AUTH0_CALLBACK_URL, AUTH0_LOGOUT_REDIRECT_URL to enable");
+        tracing::warn!("Auth0 not configured - enabling development mode");
+        tracing::warn!("Set AUTH0_DOMAIN, AUTH0_CLIENT_ID, AUTH0_CLIENT_SECRET, AUTH0_API_IDENTIFIER, AUTH0_CALLBACK_URL, AUTH0_LOGOUT_REDIRECT_URL to enable production auth");
+
+        // Enable development mode with a mock user
+        let dev_mode = DevMode {
+            mock_user_id: UserId::new(),
+        };
+        app = app.layer(Extension(dev_mode));
+        tracing::info!("Development mode enabled - all requests use mock admin user");
     }
 
     // Start the server

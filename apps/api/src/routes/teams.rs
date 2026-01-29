@@ -378,10 +378,12 @@ pub async fn create_team(
         initial_leader_id: initial_leader_id.clone(),
     };
 
-    let team = repo
-        .create(&new_team)
-        .await
-        .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
+    let team = repo.create(&new_team).await.map_err(|e| {
+        tracing::error!("Failed to create team: {:?}", e);
+        ApiError::Internal(anyhow::anyhow!("{}", e))
+    })?;
+
+    tracing::debug!("Team created successfully: {:?}", team.team_id);
 
     Ok((
         StatusCode::CREATED,

@@ -168,11 +168,11 @@ impl SkillRepository for PgSkillRepository {
                 notes = EXCLUDED.notes
             "#,
         )
-        .bind(certification_id.to_string())
-        .bind(cert.user_id.to_string())
+        .bind(certification_id)
+        .bind(cert.user_id.as_uuid())
         .bind(&cert.skill_id)
         .bind(&cert.proficiency_level)
-        .bind(cert.certified_by.to_string())
+        .bind(cert.certified_by.as_uuid())
         .bind(expires_at)
         .bind(&cert.notes)
         .execute(&self.pool)
@@ -188,7 +188,7 @@ impl SkillRepository for PgSkillRepository {
 
     async fn revoke_skill(&self, user_id: &UserId, skill_id: &str) -> Result<(), RevokeSkillError> {
         let result = sqlx::query("DELETE FROM user_skills WHERE user_id = $1 AND skill_id = $2")
-            .bind(user_id.to_string())
+            .bind(user_id.as_uuid())
             .bind(skill_id)
             .execute(&self.pool)
             .await
@@ -208,7 +208,7 @@ impl SkillRepository for PgSkillRepository {
         let rows = sqlx::query_as::<_, UserSkillRow>(
             "SELECT * FROM user_skills_with_status WHERE user_id = $1 ORDER BY skill_name",
         )
-        .bind(user_id.to_string())
+        .bind(user_id.as_uuid())
         .fetch_all(&self.pool)
         .await?;
 
@@ -223,7 +223,7 @@ impl SkillRepository for PgSkillRepository {
         let row = sqlx::query_as::<_, UserSkillRow>(
             "SELECT * FROM user_skills_with_status WHERE user_id = $1 AND skill_id = $2",
         )
-        .bind(user_id.to_string())
+        .bind(user_id.as_uuid())
         .bind(skill_id)
         .fetch_optional(&self.pool)
         .await?;

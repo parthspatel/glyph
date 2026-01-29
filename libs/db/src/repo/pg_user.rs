@@ -38,7 +38,7 @@ impl UserRepository for PgUserRepository {
             WHERE user_id = $1 AND status != 'deleted'
             "#,
         )
-        .bind(id.to_string())
+        .bind(id.as_uuid())
         .fetch_optional(&self.pool)
         .await
         .map_err(FindUserError::Database)?;
@@ -116,7 +116,7 @@ impl UserRepository for PgUserRepository {
                       skills, roles, quality_profile, created_at, updated_at
             "#,
         )
-        .bind(id.to_string())
+        .bind(id.as_uuid())
         .bind(&new_user.auth0_id)
         .bind(&new_user.email)
         .bind(&new_user.display_name)
@@ -180,7 +180,7 @@ impl UserRepository for PgUserRepository {
                       skills, roles, quality_profile, created_at, updated_at
             "#,
         )
-        .bind(id.to_string())
+        .bind(id.as_uuid())
         .bind(&update.display_name)
         .bind(update.status.map(|s| format!("{s:?}").to_lowercase()))
         .bind(&update.timezone)
@@ -256,7 +256,7 @@ impl UserRepository for PgUserRepository {
         let result = sqlx::query(
             "UPDATE users SET status = 'deleted', updated_at = NOW() WHERE user_id = $1",
         )
-        .bind(id.to_string())
+        .bind(id.as_uuid())
         .execute(&self.pool)
         .await
         .map_err(UpdateUserError::Database)?;

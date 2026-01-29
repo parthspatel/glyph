@@ -97,12 +97,24 @@
     '';
 
     dev.exec = ''
+      set -m  # Enable job control, creates new process group
+
+      cleanup() {
+        echo ""
+        echo "Shutting down..."
+        kill $(jobs -p) 2>/dev/null
+        wait
+      }
+      trap cleanup EXIT INT TERM
+
       echo "Starting development servers..."
       echo "API: http://localhost:3000"
       echo "Web: http://localhost:5173"
-      # Run both in parallel
-      (cargo run --package glyph-api &)
-      pnpm --filter @glyph/web dev
+
+      cargo run --package glyph-api &
+      pnpm --filter @glyph/web dev &
+
+      wait
     '';
 
     typegen.exec = ''

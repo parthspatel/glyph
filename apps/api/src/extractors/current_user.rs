@@ -2,6 +2,8 @@
 //!
 //! Extracts and validates the JWT from cookies to provide
 //! authenticated user context in route handlers.
+//!
+//! In development mode (when Auth0 is not configured), a mock user is returned.
 
 use std::sync::Arc;
 
@@ -19,6 +21,14 @@ pub struct AuthState {
     pub jwks_cache: Arc<JwksCache>,
     /// Auth0 configuration
     pub auth0_config: Arc<Auth0Config>,
+}
+
+/// Marker extension indicating development mode is enabled.
+/// When present, authentication is bypassed and a mock user is returned.
+#[derive(Clone, Copy)]
+pub struct DevMode {
+    /// The mock user ID to use in dev mode
+    pub mock_user_id: UserId,
 }
 
 /// Authenticated user context extracted from JWT.
@@ -80,6 +90,19 @@ where
     type Rejection = ApiError;
 
     async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        // Check for development mode first
+        if let Some(dev_mode) = parts.extensions.get::<DevMode>() {
+            tracing::debug!("Dev mode enabled, returning mock user");
+            return Ok(Self {
+                user_id: dev_mode.mock_user_id.clone(),
+                auth0_id: "dev|mock-user".to_string(),
+                email: Some("dev@localhost".to_string()),
+                email_verified: true,
+                name: Some("Development User".to_string()),
+                roles: vec!["admin".to_string(), "annotator".to_string()],
+            });
+        }
+
         // Get AuthState from request extensions
         let auth_state = parts
             .extensions

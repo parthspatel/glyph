@@ -26,20 +26,18 @@ impl TeamRepository for PgTeamRepository {
     async fn find_by_id(&self, id: &TeamId) -> Result<Option<Team>, FindTeamError> {
         let row = sqlx::query_as::<_, TeamRow>(
             r#"
-            SELECT team_id, parent_team_id, name, description, status,
+            SELECT team_id, parent_team_id, name, description, status::text,
                    capacity, specializations, created_at, updated_at
             FROM teams
             WHERE team_id = $1 AND status != 'deleted'
             "#,
         )
-        .bind(id.to_string())
+        .bind(id.as_uuid())
         .fetch_optional(&self.pool)
         .await
         .map_err(FindTeamError::Database)?;
 
-        row.map(|r| r.try_into())
-            .transpose()
-            .map_err(|_| FindTeamError::NotFound(id.clone()))
+        Ok(row.map(|r| r.into()))
     }
 
     async fn create(&self, team: &NewTeam) -> Result<Team, CreateTeamError> {
@@ -50,12 +48,12 @@ impl TeamRepository for PgTeamRepository {
             r#"
             INSERT INTO teams (team_id, parent_team_id, name, description, capacity, specializations)
             VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING team_id, parent_team_id, name, description, status,
+            RETURNING team_id, parent_team_id, name, description, status::text,
                       capacity, specializations, created_at, updated_at
             "#,
         )
-        .bind(id.to_string())
-        .bind(team.parent_team_id.as_ref().map(|p| p.to_string()))
+        .bind(id.as_uuid())
+        .bind(team.parent_team_id.as_ref().map(|p| p.as_uuid()))
         .bind(&team.name)
         .bind(&team.description)
         .bind(team.capacity)
@@ -69,8 +67,8 @@ impl TeamRepository for PgTeamRepository {
             sqlx::query(
                 "INSERT INTO team_memberships (team_id, user_id, role) VALUES ($1, $2, 'leader')",
             )
-            .bind(id.to_string())
-            .bind(leader_id.to_string())
+            .bind(id.as_uuid())
+            .bind(leader_id.as_uuid())
             .execute(&mut *tx)
             .await
             .map_err(CreateTeamError::Database)?;
@@ -78,8 +76,7 @@ impl TeamRepository for PgTeamRepository {
 
         tx.commit().await.map_err(CreateTeamError::Database)?;
 
-        row.try_into()
-            .map_err(|_| CreateTeamError::Database(sqlx::Error::RowNotFound))
+        Ok(row.into())
     }
 
     async fn update(&self, id: &TeamId, update: &TeamUpdate) -> Result<Team, UpdateTeamError> {
@@ -93,11 +90,11 @@ impl TeamRepository for PgTeamRepository {
                 specializations = COALESCE($6, specializations),
                 updated_at = NOW()
             WHERE team_id = $1 AND status != 'deleted'
-            RETURNING team_id, parent_team_id, name, description, status,
+            RETURNING team_id, parent_team_id, name, description, status::text,
                       capacity, specializations, created_at, updated_at
             "#,
         )
-        .bind(id.to_string())
+        .bind(id.as_uuid())
         .bind(&update.name)
         .bind(&update.description)
         .bind(update.status.map(|s| format!("{:?}", s).to_lowercase()))
@@ -113,8 +110,7 @@ impl TeamRepository for PgTeamRepository {
         .map_err(UpdateTeamError::Database)?
         .ok_or_else(|| UpdateTeamError::NotFound(id.clone()))?;
 
-        row.try_into()
-            .map_err(|_| UpdateTeamError::Database(sqlx::Error::RowNotFound))
+        Ok(row.into())
     }
 
     async fn list(&self, pagination: Pagination) -> Result<Page<Team>, sqlx::Error> {
@@ -125,7 +121,7 @@ impl TeamRepository for PgTeamRepository {
 
         let rows = sqlx::query_as::<_, TeamRow>(
             r#"
-            SELECT team_id, parent_team_id, name, description, status,
+            SELECT team_id, parent_team_id, name, description, status::text,
                    capacity, specializations, created_at, updated_at
             FROM teams
             WHERE status != 'deleted'
@@ -138,7 +134,7 @@ impl TeamRepository for PgTeamRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let teams = rows.into_iter().filter_map(|r| r.try_into().ok()).collect();
+        let teams = rows.into_iter().map(|r| r.into()).collect();
         Ok(Page::new(teams, total, &pagination))
     }
 
@@ -151,7 +147,7 @@ impl TeamRepository for PgTeamRepository {
 
         let rows = sqlx::query_as::<_, TeamRow>(
             r#"
-            SELECT team_id, parent_team_id, name, description, status,
+            SELECT team_id, parent_team_id, name, description, status::text,
                    capacity, specializations, created_at, updated_at
             FROM teams
             WHERE parent_team_id IS NULL AND status != 'deleted'
@@ -164,26 +160,26 @@ impl TeamRepository for PgTeamRepository {
         .fetch_all(&self.pool)
         .await?;
 
-        let teams = rows.into_iter().filter_map(|r| r.try_into().ok()).collect();
+        let teams = rows.into_iter().map(|r| r.into()).collect();
         Ok(Page::new(teams, total, &pagination))
     }
 
     async fn get_sub_teams(&self, team_id: &TeamId) -> Result<Vec<Team>, FindTeamError> {
         let rows = sqlx::query_as::<_, TeamRow>(
             r#"
-            SELECT team_id, parent_team_id, name, description, status,
+            SELECT team_id, parent_team_id, name, description, status::text,
                    capacity, specializations, created_at, updated_at
             FROM teams
             WHERE parent_team_id = $1 AND status != 'deleted'
             ORDER BY name
             "#,
         )
-        .bind(team_id.to_string())
+        .bind(team_id.as_uuid())
         .fetch_all(&self.pool)
         .await
         .map_err(FindTeamError::Database)?;
 
-        Ok(rows.into_iter().filter_map(|r| r.try_into().ok()).collect())
+        Ok(rows.into_iter().map(|r| r.into()).collect())
     }
 
     async fn get_team_tree(&self, team_id: &TeamId) -> Result<Vec<TeamTreeNode>, FindTeamError> {
@@ -191,7 +187,7 @@ impl TeamRepository for PgTeamRepository {
             r#"
             WITH RECURSIVE team_tree AS (
                 SELECT t.team_id, t.parent_team_id, t.name, t.description,
-                       t.status, t.capacity, t.specializations, t.created_at, t.updated_at,
+                       t.status::text, t.capacity, t.specializations, t.created_at, t.updated_at,
                        0 as depth
                 FROM teams t
                 WHERE t.team_id = $1 AND t.status != 'deleted'
@@ -199,7 +195,7 @@ impl TeamRepository for PgTeamRepository {
                 UNION ALL
 
                 SELECT t.team_id, t.parent_team_id, t.name, t.description,
-                       t.status, t.capacity, t.specializations, t.created_at, t.updated_at,
+                       t.status::text, t.capacity, t.specializations, t.created_at, t.updated_at,
                        tt.depth + 1
                 FROM teams t
                 JOIN team_tree tt ON t.parent_team_id = tt.team_id
@@ -213,12 +209,12 @@ impl TeamRepository for PgTeamRepository {
             ORDER BY tt.depth, tt.name
             "#,
         )
-        .bind(team_id.to_string())
+        .bind(team_id.as_uuid())
         .fetch_all(&self.pool)
         .await
         .map_err(FindTeamError::Database)?;
 
-        Ok(rows.into_iter().filter_map(|r| r.try_into().ok()).collect())
+        Ok(rows.into_iter().map(|r| r.into()).collect())
     }
 
     async fn add_member(
@@ -235,8 +231,8 @@ impl TeamRepository for PgTeamRepository {
             RETURNING team_id, user_id, role, allocation_percentage, joined_at
             "#,
         )
-        .bind(team_id.to_string())
-        .bind(user_id.to_string())
+        .bind(team_id.as_uuid())
+        .bind(user_id.as_uuid())
         .bind(format!("{:?}", role).to_lowercase())
         .bind(allocation)
         .fetch_one(&self.pool)
@@ -250,8 +246,7 @@ impl TeamRepository for PgTeamRepository {
             TeamMembershipError::Database(e)
         })?;
 
-        row.try_into()
-            .map_err(|_| TeamMembershipError::Database(sqlx::Error::RowNotFound))
+        Ok(row.into())
     }
 
     async fn remove_member(
@@ -261,8 +256,8 @@ impl TeamRepository for PgTeamRepository {
     ) -> Result<(), TeamMembershipError> {
         let result =
             sqlx::query("DELETE FROM team_memberships WHERE team_id = $1 AND user_id = $2")
-                .bind(team_id.to_string())
-                .bind(user_id.to_string())
+                .bind(team_id.as_uuid())
+                .bind(user_id.as_uuid())
                 .execute(&self.pool)
                 .await
                 .map_err(TeamMembershipError::Database)?;
@@ -290,8 +285,8 @@ impl TeamRepository for PgTeamRepository {
             RETURNING team_id, user_id, role, allocation_percentage, joined_at
             "#,
         )
-        .bind(team_id.to_string())
-        .bind(user_id.to_string())
+        .bind(team_id.as_uuid())
+        .bind(user_id.as_uuid())
         .bind(role.map(|r| format!("{:?}", r).to_lowercase()))
         .bind(allocation)
         .fetch_optional(&self.pool)
@@ -299,8 +294,7 @@ impl TeamRepository for PgTeamRepository {
         .map_err(TeamMembershipError::Database)?
         .ok_or(TeamMembershipError::NotAMember)?;
 
-        row.try_into()
-            .map_err(|_| TeamMembershipError::Database(sqlx::Error::RowNotFound))
+        Ok(row.into())
     }
 
     async fn list_members(
@@ -311,7 +305,7 @@ impl TeamRepository for PgTeamRepository {
         let total = sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM team_memberships WHERE team_id = $1",
         )
-        .bind(team_id.to_string())
+        .bind(team_id.as_uuid())
         .fetch_one(&self.pool)
         .await
         .map_err(FindTeamError::Database)?;
@@ -327,20 +321,20 @@ impl TeamRepository for PgTeamRepository {
             LIMIT $2 OFFSET $3
             "#,
         )
-        .bind(team_id.to_string())
+        .bind(team_id.as_uuid())
         .bind(pagination.clamped_limit())
         .bind(pagination.offset)
         .fetch_all(&self.pool)
         .await
         .map_err(FindTeamError::Database)?;
 
-        let members = rows.into_iter().filter_map(|r| r.try_into().ok()).collect();
+        let members = rows.into_iter().map(|r| r.into()).collect();
         Ok(Page::new(members, total, &pagination))
     }
 
     async fn get_member_count(&self, team_id: &TeamId) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM team_memberships WHERE team_id = $1")
-            .bind(team_id.to_string())
+            .bind(team_id.as_uuid())
             .fetch_one(&self.pool)
             .await
     }
@@ -349,7 +343,7 @@ impl TeamRepository for PgTeamRepository {
         let result = sqlx::query(
             "UPDATE teams SET status = 'deleted', updated_at = NOW() WHERE team_id = $1",
         )
-        .bind(id.to_string())
+        .bind(id.as_uuid())
         .execute(&self.pool)
         .await
         .map_err(UpdateTeamError::Database)?;
@@ -368,8 +362,8 @@ impl TeamRepository for PgTeamRepository {
 
 #[derive(sqlx::FromRow)]
 struct TeamRow {
-    team_id: String,
-    parent_team_id: Option<String>,
+    team_id: uuid::Uuid,
+    parent_team_id: Option<uuid::Uuid>,
     name: String,
     description: Option<String>,
     status: String,
@@ -379,13 +373,11 @@ struct TeamRow {
     updated_at: chrono::DateTime<chrono::Utc>,
 }
 
-impl TryFrom<TeamRow> for Team {
-    type Error = glyph_domain::IdParseError;
-
-    fn try_from(r: TeamRow) -> Result<Self, Self::Error> {
-        Ok(Self {
-            team_id: r.team_id.parse()?,
-            parent_team_id: r.parent_team_id.map(|s| s.parse()).transpose()?,
+impl From<TeamRow> for Team {
+    fn from(r: TeamRow) -> Self {
+        Self {
+            team_id: TeamId::from_uuid(r.team_id),
+            parent_team_id: r.parent_team_id.map(TeamId::from_uuid),
             name: r.name,
             description: r.description,
             status: parse_team_status(&r.status),
@@ -393,14 +385,14 @@ impl TryFrom<TeamRow> for Team {
             specializations: serde_json::from_value(r.specializations).unwrap_or_default(),
             created_at: r.created_at,
             updated_at: r.updated_at,
-        })
+        }
     }
 }
 
 #[derive(sqlx::FromRow)]
 struct TeamTreeRow {
-    team_id: String,
-    parent_team_id: Option<String>,
+    team_id: uuid::Uuid,
+    parent_team_id: Option<uuid::Uuid>,
     name: String,
     description: Option<String>,
     status: String,
@@ -413,14 +405,12 @@ struct TeamTreeRow {
     sub_team_count: i64,
 }
 
-impl TryFrom<TeamTreeRow> for TeamTreeNode {
-    type Error = glyph_domain::IdParseError;
-
-    fn try_from(r: TeamTreeRow) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<TeamTreeRow> for TeamTreeNode {
+    fn from(r: TeamTreeRow) -> Self {
+        Self {
             team: Team {
-                team_id: r.team_id.parse()?,
-                parent_team_id: r.parent_team_id.map(|s| s.parse()).transpose()?,
+                team_id: TeamId::from_uuid(r.team_id),
+                parent_team_id: r.parent_team_id.map(TeamId::from_uuid),
                 name: r.name,
                 description: r.description,
                 status: parse_team_status(&r.status),
@@ -432,37 +422,35 @@ impl TryFrom<TeamTreeRow> for TeamTreeNode {
             depth: r.depth,
             member_count: r.member_count,
             sub_team_count: r.sub_team_count,
-        })
+        }
     }
 }
 
 #[derive(sqlx::FromRow)]
 struct TeamMembershipRow {
-    team_id: String,
-    user_id: String,
+    team_id: uuid::Uuid,
+    user_id: uuid::Uuid,
     role: String,
     allocation_percentage: Option<i32>,
     joined_at: chrono::DateTime<chrono::Utc>,
 }
 
-impl TryFrom<TeamMembershipRow> for TeamMembership {
-    type Error = glyph_domain::IdParseError;
-
-    fn try_from(r: TeamMembershipRow) -> Result<Self, Self::Error> {
-        Ok(Self {
-            team_id: r.team_id.parse()?,
-            user_id: r.user_id.parse()?,
+impl From<TeamMembershipRow> for TeamMembership {
+    fn from(r: TeamMembershipRow) -> Self {
+        Self {
+            team_id: TeamId::from_uuid(r.team_id),
+            user_id: UserId::from_uuid(r.user_id),
             role: parse_team_role(&r.role),
             allocation_percentage: r.allocation_percentage,
             joined_at: r.joined_at,
-        })
+        }
     }
 }
 
 #[derive(sqlx::FromRow)]
 struct TeamMemberWithUserRow {
-    team_id: String,
-    user_id: String,
+    team_id: uuid::Uuid,
+    user_id: uuid::Uuid,
     role: String,
     allocation_percentage: Option<i32>,
     joined_at: chrono::DateTime<chrono::Utc>,
@@ -470,19 +458,17 @@ struct TeamMemberWithUserRow {
     email: String,
 }
 
-impl TryFrom<TeamMemberWithUserRow> for TeamMembershipWithUser {
-    type Error = glyph_domain::IdParseError;
-
-    fn try_from(r: TeamMemberWithUserRow) -> Result<Self, Self::Error> {
-        Ok(Self {
-            team_id: r.team_id.parse()?,
-            user_id: r.user_id.parse()?,
+impl From<TeamMemberWithUserRow> for TeamMembershipWithUser {
+    fn from(r: TeamMemberWithUserRow) -> Self {
+        Self {
+            team_id: TeamId::from_uuid(r.team_id),
+            user_id: UserId::from_uuid(r.user_id),
             role: parse_team_role(&r.role),
             allocation_percentage: r.allocation_percentage,
             joined_at: r.joined_at,
             display_name: r.display_name,
             email: r.email,
-        })
+        }
     }
 }
 
