@@ -1,10 +1,13 @@
 /**
  * Hook for warning users about unsaved changes.
- * Handles both browser close/refresh and client-side navigation.
+ * Handles browser close/refresh with beforeunload event.
+ *
+ * Note: Client-side navigation blocking requires a data router (createBrowserRouter).
+ * This implementation uses beforeunload for browser-level protection and provides
+ * a simplified interface for components to track dirty state.
  */
 
-import { useEffect, useRef, useCallback } from 'react';
-import { useBlocker } from 'react-router-dom';
+import { useEffect, useRef } from "react";
 
 interface UseUnsavedChangesOptions {
   /**
@@ -29,48 +32,26 @@ interface UseUnsavedChangesReturn {
    * Current dirty state.
    */
   isDirty: boolean;
-  /**
-   * Whether navigation is currently blocked.
-   */
-  isBlocked: boolean;
-  /**
-   * Proceed with navigation despite unsaved changes.
-   */
-  proceed: () => void;
-  /**
-   * Cancel navigation and stay on the page.
-   */
-  stay: () => void;
 }
 
 /**
  * Prevents accidental loss of unsaved changes by warning users
- * when they try to leave the page.
+ * when they try to close/refresh the browser.
  *
  * @example
  * ```tsx
  * function EditForm() {
  *   const { isDirty } = useForm();
- *   const { isBlocked, proceed, stay } = useUnsavedChanges({ isDirty });
+ *   useUnsavedChanges({ isDirty });
  *
- *   return (
- *     <>
- *       <form>...</form>
- *       {isBlocked && (
- *         <ConfirmDialog
- *           onConfirm={proceed}
- *           onCancel={stay}
- *         />
- *       )}
- *     </>
- *   );
+ *   return <form>...</form>;
  * }
  * ```
  */
 export function useUnsavedChanges({
   isDirty,
   enabled = true,
-  message = 'You have unsaved changes. Are you sure you want to leave?',
+  message = "You have unsaved changes. Are you sure you want to leave?",
 }: UseUnsavedChangesOptions): UseUnsavedChangesReturn {
   // Use ref to avoid stale closure in event handler
   const isDirtyRef = useRef(isDirty);
@@ -93,50 +74,12 @@ export function useUnsavedChanges({
       }
     };
 
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [enabled]);
-
-  // Handle client-side navigation with react-router-dom's useBlocker
-  const blocker = useBlocker(
-    ({ currentLocation, nextLocation }) =>
-      enabled &&
-      isDirty &&
-      currentLocation.pathname !== nextLocation.pathname
-  );
-
-  // Auto-show confirmation dialog when blocked
-  // This provides a fallback UX if the component doesn't render a custom dialog
-  useEffect(() => {
-    if (blocker.state === 'blocked') {
-      // Use native confirm as fallback
-      // Component can override this by checking isBlocked and showing custom dialog
-      const shouldLeave = window.confirm(messageRef.current);
-      if (shouldLeave) {
-        blocker.proceed();
-      } else {
-        blocker.reset();
-      }
-    }
-  }, [blocker]);
-
-  const proceed = useCallback(() => {
-    if (blocker.state === 'blocked') {
-      blocker.proceed();
-    }
-  }, [blocker]);
-
-  const stay = useCallback(() => {
-    if (blocker.state === 'blocked') {
-      blocker.reset();
-    }
-  }, [blocker]);
 
   return {
     isDirty,
-    isBlocked: blocker.state === 'blocked',
-    proceed,
-    stay,
   };
 }
 
