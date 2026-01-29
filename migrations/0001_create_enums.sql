@@ -114,3 +114,7 @@ CREATE TYPE transition_condition_type AS ENUM (
 CREATE TYPE timeout_action AS ENUM ('proceed', 'retry', 'escalate');
 
 CREATE TYPE proficiency_level AS ENUM ('novice', 'intermediate', 'advanced', 'expert');
+
+-- Team enums
+CREATE TYPE team_status AS ENUM ('active', 'inactive', 'deleted');
+CREATE TYPE team_role AS ENUM ('leader', 'member');
