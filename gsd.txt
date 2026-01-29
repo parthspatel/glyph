@@ -1,0 +1,9 @@
+/gsd:discuss-phase 5
+/gsd:list-phase-assumptions 5
+/gsd:plan-phase 5
+/gsd:execute-phase 5
+/gsd:verify-work 5
+
+
+/gsd:map-codebase
+/gsd:progress
