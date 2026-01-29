@@ -18,10 +18,14 @@ use crate::repo::errors::*;
 // =============================================================================
 
 /// Input for creating a new user
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NewUser {
     pub email: String,
     pub display_name: String,
+    pub auth0_id: Option<String>,
+    pub timezone: Option<String>,
+    pub department: Option<String>,
+    pub global_role: Option<glyph_domain::GlobalRole>,
 }
 
 /// Input for updating a user
@@ -29,6 +33,12 @@ pub struct NewUser {
 pub struct UserUpdate {
     pub display_name: Option<String>,
     pub status: Option<UserStatus>,
+    pub timezone: Option<String>,
+    pub department: Option<String>,
+    pub bio: Option<String>,
+    pub avatar_url: Option<String>,
+    pub contact_info: Option<glyph_domain::ContactInfo>,
+    pub global_role: Option<glyph_domain::GlobalRole>,
 }
 
 /// Input for creating a new team
@@ -116,6 +126,9 @@ pub trait UserRepository: Send + Sync {
 
     /// Find a user by email
     async fn find_by_email(&self, email: &str) -> Result<Option<User>, FindUserError>;
+
+    /// Find a user by Auth0 subject ID
+    async fn find_by_auth0_id(&self, auth0_id: &str) -> Result<Option<User>, FindUserError>;
 
     /// Create a new user
     async fn create(&self, user: &NewUser) -> Result<User, CreateUserError>;

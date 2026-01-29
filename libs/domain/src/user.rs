@@ -8,14 +8,40 @@ use uuid::Uuid;
 use crate::enums::{ProficiencyLevel, SkillStatus, UserStatus};
 use crate::ids::UserId;
 
+/// Global role for platform-wide permissions
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GlobalRole {
+    Admin,
+    #[default]
+    User,
+}
+
+/// Contact information for a user
+#[typeshare]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ContactInfo {
+    pub phone: Option<String>,
+    pub slack_handle: Option<String>,
+    pub office_location: Option<String>,
+}
+
 /// A user in the system
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub user_id: UserId,
+    pub auth0_id: Option<String>,
     pub email: String,
     pub display_name: String,
     pub status: UserStatus,
+    pub timezone: Option<String>,
+    pub department: Option<String>,
+    pub bio: Option<String>,
+    pub avatar_url: Option<String>,
+    pub contact_info: ContactInfo,
+    pub global_role: GlobalRole,
     pub skills: Vec<UserSkill>,
     pub roles: Vec<String>,
     pub quality_profile: QualityProfile,
