@@ -239,6 +239,13 @@
 
 **Depends on**: Phase 5
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 05.1-01-PLAN.md — Fix breadcrumb cache lookup and add route labels
+- [ ] 05.1-02-PLAN.md — Create Project Types admin page with navigation
+- [ ] 05.1-03-PLAN.md — Add project-scoped sidebar navigation
+
 ### Deliverables
 - [ ] Navigation links to Projects list page
 - [ ] Navigation to Project creation wizard
