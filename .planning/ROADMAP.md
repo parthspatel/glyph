@@ -101,6 +101,33 @@
 
 ---
 
+## Phase 3.1: Style Guideline ✅
+
+**Goal**: Build a comprehensive style guideline for Glyph with dark/light mode support and royal purple as the key brand color.
+
+**Depends on**: Phase 3
+
+**Completed**: 2026-01-31
+
+### Deliverables
+- [x] Design tokens (colors, spacing, typography, shadows)
+- [x] Royal purple color palette with semantic variants
+- [x] Dark mode color scheme
+- [x] Light mode color scheme
+- [x] Auto theme detection based on system preference
+- [x] CSS custom properties for theming
+- [x] Theme toggle component (optional manual override)
+- [x] Component style patterns documentation
+- [x] Updated index.css with design system
+
+### Success Criteria
+- [x] Theme switches automatically based on system preference
+- [x] Royal purple is consistently used as primary brand color
+- [x] All existing components work in both themes
+- [x] Design tokens are documented and reusable
+
+---
+
 ## Phase 4: User & Team Management ✅
 
 **Goal**: Full user and team management with RBAC.
@@ -129,6 +156,56 @@
 
 ---
 
+## Phase 4.1: UX Navigation Flow (INSERTED)
+
+**Goal**: Ensure complete UX navigation flow from root (/) to all Phase 4 screens (users, teams, profiles).
+
+**Depends on**: Phase 4
+
+### Deliverables
+- [ ] Root route (/) with dashboard or landing page
+- [ ] Main navigation component (header/sidebar)
+- [ ] Navigation links to Users, Teams, Profile pages
+- [ ] Breadcrumb navigation for nested pages
+- [ ] Active state indicators for current route
+- [ ] Mobile-responsive navigation
+- [ ] Route protection for admin-only pages
+
+### Success Criteria
+- User can navigate from / to all Phase 4 screens
+- Navigation shows current location
+- Admin pages are protected and hidden from non-admins
+- Navigation works on mobile devices
+
+---
+
+## Phase 4.2: Style Phase 4 Screens (INSERTED)
+
+**Goal**: Apply the design system from Phase 3.1 to all Phase 4 screens (users, teams, profiles) for consistent theming.
+
+**Depends on**: Phase 3.1, Phase 4.1
+
+### Deliverables
+- [ ] Apply design tokens to UserProfilePage
+- [ ] Apply design tokens to UsersPage (admin)
+- [ ] Apply design tokens to TeamsPage
+- [ ] Apply design tokens to TeamDetailPage
+- [ ] Style SkillBadges component with theme colors
+- [ ] Style QualityStats component with theme colors
+- [ ] Style UserTable with theme colors
+- [ ] Style TeamTree with theme colors
+- [ ] Style MemberList with theme colors
+- [ ] Style AddMemberModal with theme colors
+- [ ] Ensure dark/light mode works on all screens
+
+### Success Criteria
+- All Phase 4 screens use design tokens consistently
+- Royal purple is visible as primary accent color
+- Dark and light modes render correctly on all screens
+- No hardcoded colors remain in Phase 4 components
+
+---
+
 ## Phase 5: Project Management
 
 **Goal**: Project and project type configuration.
@@ -151,6 +228,54 @@
 - Schema validation works for test payloads
 - Project lifecycle transitions work
 - UI supports full project management
+
+---
+
+## Phase 5.1: UX Navigation Flow for Phase 5 (INSERTED)
+
+**Goal**: Ensure complete UX navigation flow from root (/) to all Phase 5 screens (projects, project types, data sources).
+
+**Depends on**: Phase 5
+
+### Deliverables
+- [ ] Navigation links to Projects list page
+- [ ] Navigation to Project creation wizard
+- [ ] Navigation to Project settings/detail page
+- [ ] Navigation to Project types management
+- [ ] Breadcrumb navigation for project hierarchy
+- [ ] Active state indicators for project routes
+- [ ] Project-scoped navigation (within a project context)
+
+### Success Criteria
+- User can navigate from / to all Phase 5 screens
+- Navigation shows current project context
+- Breadcrumbs reflect project hierarchy
+- Project routes are accessible from main navigation
+
+---
+
+## Phase 5.2: Style Phase 5 Screens (INSERTED)
+
+**Goal**: Apply the design system from Phase 3.1 to all Phase 5 screens (projects, project types, data sources) for consistent theming.
+
+**Depends on**: Phase 3.1, Phase 5.1
+
+### Deliverables
+- [ ] Apply design tokens to ProjectsPage (list view)
+- [ ] Apply design tokens to Project creation wizard
+- [ ] Apply design tokens to Project settings page
+- [ ] Apply design tokens to Project detail page
+- [ ] Style ProjectCard component with theme colors
+- [ ] Style ProjectTable component with theme colors
+- [ ] Style ProjectTypeSelector with theme colors
+- [ ] Style DataSourceConfig with theme colors
+- [ ] Ensure dark/light mode works on all Phase 5 screens
+
+### Success Criteria
+- All Phase 5 screens use design tokens consistently
+- Royal purple is visible as primary accent color
+- Dark and light modes render correctly on all screens
+- No hardcoded colors remain in Phase 5 components
 
 ---
 
