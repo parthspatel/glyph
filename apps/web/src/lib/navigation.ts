@@ -44,4 +44,7 @@ export const routeLabels: Record<string, string> = {
   tasks: "Tasks",
   annotate: "Annotate",
   settings: "Settings",
+  "project-types": "Project Types",
+  sources: "Data Sources",
+  overview: "Overview",
 };
