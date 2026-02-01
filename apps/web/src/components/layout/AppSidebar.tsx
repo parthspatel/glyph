@@ -1,4 +1,4 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -9,6 +9,7 @@ import {
   SidebarMenuButton,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -17,9 +18,18 @@ import { useCurrentUser } from "@/hooks/useUser";
 import { UserMenu } from "./UserMenu";
 import { cn } from "@/lib/utils";
 import { useRef, useCallback } from "react";
+import { FileText, Settings, ClipboardList } from "lucide-react";
+
+// Project-scoped navigation items
+const projectNavItems = [
+  { path: "", label: "Overview", icon: FileText },
+  { path: "/edit", label: "Settings", icon: Settings },
+  { path: "/tasks", label: "Tasks", icon: ClipboardList },
+];
 
 export function AppSidebar() {
   const location = useLocation();
+  const params = useParams<{ projectId?: string }>();
   const { data: user } = useCurrentUser();
   const filteredItems = filterNavItems(navItems, user?.global_role);
   const { state, setOpen } = useSidebar();
@@ -27,6 +37,12 @@ export function AppSidebar() {
   // Track if sidebar was manually collapsed (vs auto-collapsed)
   const wasCollapsedRef = useRef(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Detect project context - show project nav when viewing a specific project
+  const isProjectContext =
+    location.pathname.startsWith("/projects/") &&
+    params.projectId &&
+    params.projectId !== "new";
 
   const isActive = (href: string) => {
     if (href === "/") {
@@ -102,6 +118,41 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+        {isProjectContext && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-xs font-medium text-muted-foreground">
+              Project
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {projectNavItems.map((item) => {
+                  const fullPath = `/projects/${params.projectId}${item.path}`;
+                  const isItemActive = location.pathname === fullPath;
+                  return (
+                    <SidebarMenuItem key={item.path || "overview"}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isItemActive}
+                        tooltip={item.label}
+                        className={cn(
+                          isItemActive &&
+                            "border-l-2 border-primary bg-accent font-semibold",
+                        )}
+                      >
+                        <Link to={fullPath}>
+                          <item.icon
+                            className={cn(isItemActive && "text-primary")}
+                          />
+                          <span>{item.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter className="border-t">
         <UserMenu />
