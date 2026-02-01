@@ -10,16 +10,23 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { navItems, filterNavItems } from "@/lib/navigation";
 import { useCurrentUser } from "@/hooks/useUser";
 import { UserMenu } from "./UserMenu";
 import { cn } from "@/lib/utils";
+import { useRef, useCallback } from "react";
 
 export function AppSidebar() {
   const location = useLocation();
   const { data: user } = useCurrentUser();
   const filteredItems = filterNavItems(navItems, user?.global_role);
+  const { state, setOpen } = useSidebar();
+
+  // Track if sidebar was manually collapsed (vs auto-collapsed)
+  const wasCollapsedRef = useRef(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const isActive = (href: string) => {
     if (href === "/") {
@@ -30,8 +37,37 @@ export function AppSidebar() {
     );
   };
 
+  const handleMouseEnter = useCallback(() => {
+    // Clear any pending collapse
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+
+    // Only expand on hover if currently collapsed
+    if (state === "collapsed") {
+      wasCollapsedRef.current = true;
+      setOpen(true);
+    }
+  }, [state, setOpen]);
+
+  const handleMouseLeave = useCallback(() => {
+    // Only auto-collapse if we expanded via hover
+    if (wasCollapsedRef.current) {
+      // Small delay to prevent flickering when moving between elements
+      hoverTimeoutRef.current = setTimeout(() => {
+        setOpen(false);
+        wasCollapsedRef.current = false;
+      }, 300);
+    }
+  }, [setOpen]);
+
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar
+      collapsible="icon"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <SidebarHeader className="border-b px-4 py-3">
         <Link to="/" className="flex items-center gap-2 font-semibold">
           <span className="text-xl text-primary">✦</span>

@@ -11,8 +11,6 @@ import { MobileNav } from "./MobileNav";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-const SIDEBAR_STATE_KEY = "glyph-sidebar-state";
-
 function LayoutContent() {
   const { isMobile } = useSidebar();
 
@@ -36,14 +34,8 @@ function LayoutContent() {
 }
 
 export function AppLayout() {
-  const defaultOpen = localStorage.getItem(SIDEBAR_STATE_KEY) !== "false";
-
-  const handleOpenChange = (open: boolean) => {
-    localStorage.setItem(SIDEBAR_STATE_KEY, String(open));
-  };
-
   return (
-    <SidebarProvider defaultOpen={defaultOpen} onOpenChange={handleOpenChange}>
+    <SidebarProvider defaultOpen={true}>
       <LayoutContent />
     </SidebarProvider>
   );
