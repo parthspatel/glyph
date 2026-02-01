@@ -5,9 +5,9 @@
 ## Current Position
 
 - **Milestone**: v1.0
-- **Current Phase**: 4.1 (UX Navigation Flow)
+- **Current Phase**: 4.2 (Style Phase 4 Screens)
 - **Phase Status**: Ready
-- **Overall Progress**: 36% (5/14 phases)
+- **Overall Progress**: 43% (6/14 phases)
 
 ## Phase Summary
 
@@ -18,8 +18,8 @@
 | 3 | Authentication | ✅ Verified | [VERIFICATION.md](phases/03-authentication/03-VERIFICATION.md) |
 | 3.1 | Style Guideline | ✅ Verified | [VERIFICATION.md](phases/03.1-style-guideline/3.1-VERIFICATION.md) |
 | 4 | User & Team Management | ✅ Verified | [VERIFICATION.md](phases/04-user-team-management/04-VERIFICATION.md) |
-| 4.1 | UX Navigation Flow | 🟡 Ready | — |
-| 4.2 | Style Phase 4 Screens | ⚪ Blocked | — |
+| 4.1 | UX Navigation Flow | ✅ Verified | [VERIFICATION.md](phases/04.1-ux-navigation-flow/4.1-VERIFICATION.md) |
+| 4.2 | Style Phase 4 Screens | 🟡 Ready | — |
 | 5 | Project Management | ⚪ Blocked | — |
 | 6 | Workflow Engine | ⚪ Blocked | — |
 | 7 | Task Management | ⚪ Blocked | — |
@@ -33,6 +33,14 @@
 
 ## Recent Activity
 
+- **2026-01-31**: Phase 4.1 (UX Navigation Flow) verified
+  - shadcn/ui sidebar with hover-to-expand behavior
+  - Role-based navigation filtering
+  - Breadcrumb navigation with React Query cache integration
+  - Protected routes for admin pages
+  - Mobile bottom tab navigation
+  - Home page with role-based redirects
+  - All routes wrapped in AppLayout with SidebarProvider
 - **2026-01-31**: Phase 3.1 (Style Guideline) verified
   - Tailwind v4 with Vite plugin (CSS-based config)
   - OKLCH design tokens for light/dark modes
@@ -59,7 +67,7 @@
 ## Roadmap Evolution
 
 - Phase 3.1 inserted after Phase 3: Style Guideline ✅ COMPLETE
-- Phase 4.1 inserted after Phase 4: UX Navigation Flow (URGENT) - Ensure navigation from root to all Phase 4 screens
+- Phase 4.1 inserted after Phase 4: UX Navigation Flow ✅ COMPLETE
 - Phase 4.2 inserted after Phase 4.1: Style Phase 4 Screens (URGENT) - Apply design system to all Phase 4 UI screens
 - Phase 5.1 inserted after Phase 5: UX Navigation Flow for Phase 5 (URGENT) - Ensure navigation from root to all Phase 5 screens
 - Phase 5.2 inserted after Phase 5.1: Style Phase 5 Screens (URGENT) - Apply design system to all Phase 5 UI screens
@@ -68,6 +76,9 @@
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-01-31 | Hover-to-expand sidebar | Better UX than requiring click to expand collapsed sidebar |
+| 2026-01-31 | Role-based nav filtering | Hide admin links from non-admins for cleaner UX |
+| 2026-01-31 | React Query cache for breadcrumbs | Dynamic entity names without extra API calls |
 | 2026-01-31 | OKLCH color format | Perceptually uniform, better cross-theme consistency |
 | 2026-01-31 | Tailwind v4 CSS-based config | No tailwind.config.js needed, simpler setup |
 | 2026-01-31 | Pure black dark mode | OLED-friendly, high contrast design |
@@ -93,24 +104,25 @@ None.
 ## Session Continuity
 
 Last worked: 2026-01-31
-Context: Phase 3.1 verified, ready for Phase 4.1 (UX Navigation Flow)
+Context: Phase 4.1 verified, ready for Phase 4.2 (Style Phase 4 Screens)
 
 ## Next Actions
 
-1. Run `/gsd:plan-phase 4.1` to plan the UX Navigation Flow phase
-2. Phase 4.1 covers: Root route, main navigation, breadcrumbs, route protection
+1. Run `/gsd:plan-phase 4.2` to plan the Style Phase 4 Screens phase
+2. Phase 4.2 covers: Apply design tokens to all Phase 4 screens (users, teams, profiles)
 
-## Phase 3.1 Deliverables
+## Phase 4.1 Deliverables
 
 | Deliverable | Status |
 |-------------|--------|
-| Tailwind v4 with Vite plugin | ✅ |
-| Path alias @ → src | ✅ |
-| cn() utility function | ✅ |
-| OKLCH design tokens (light/dark) | ✅ |
-| Purple primary color | ✅ |
-| ThemeProvider component | ✅ |
-| useTheme hook | ✅ |
-| FOWT prevention script | ✅ |
-| shadcn/ui components.json | ✅ |
-| ThemeProvider integration in main.tsx | ✅ |
+| shadcn/ui sidebar components | ✅ |
+| Navigation config (lib/navigation.ts) | ✅ |
+| AppLayout with SidebarProvider | ✅ |
+| AppSidebar with hover expand | ✅ |
+| UserMenu dropdown | ✅ |
+| Breadcrumbs component | ✅ |
+| useBreadcrumbs hook | ✅ |
+| ProtectedRoute component | ✅ |
+| MobileNav bottom bar | ✅ |
+| HomePage with role redirects | ✅ |
+| Route integration in App.tsx | ✅ |
