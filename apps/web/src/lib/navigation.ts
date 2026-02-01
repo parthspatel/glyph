@@ -5,6 +5,7 @@ import {
   UserCog,
   ClipboardList,
   Settings,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 
@@ -21,6 +22,12 @@ export const navItems: NavItem[] = [
   { href: "/teams", label: "Teams", icon: Users },
   { href: "/tasks", label: "My Tasks", icon: ClipboardList },
   { href: "/admin/users", label: "Users", icon: UserCog, roles: ["admin"] },
+  {
+    href: "/admin/project-types",
+    label: "Project Types",
+    icon: Layers,
+    roles: ["admin"],
+  },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

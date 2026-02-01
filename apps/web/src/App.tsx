@@ -13,6 +13,7 @@ import { TasksPage } from "./pages/TasksPage";
 import { AnnotatePage } from "./pages/AnnotatePage";
 import { UserProfilePage } from "./pages/UserProfilePage";
 import { AdminUsersPage } from "./pages/admin/UsersPage";
+import { ProjectTypesPage } from "./pages/admin/ProjectTypesPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 
@@ -34,6 +35,7 @@ export function App() {
         {/* Admin-only routes */}
         <Route element={<ProtectedRoute requiredRoles={["admin"]} />}>
           <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/project-types" element={<ProjectTypesPage />} />
         </Route>
       </Route>
     </Routes>
