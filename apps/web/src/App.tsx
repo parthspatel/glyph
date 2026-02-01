@@ -1,5 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 
+// Layout
+import { AppLayout } from "./components/layout";
+
 // Pages
 import { HomePage } from "./pages/HomePage";
 import { ProjectsPage } from "./pages/ProjectsPage";
@@ -15,8 +18,8 @@ import { TeamDetailPage } from "./pages/TeamDetailPage";
 
 export function App() {
   return (
-    <div className="app">
-      <Routes>
+    <Routes>
+      <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/new" element={<ProjectCreatePage />} />
@@ -28,7 +31,7 @@ export function App() {
         <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailPage />} />
-      </Routes>
-    </div>
+      </Route>
+    </Routes>
   );
 }
