@@ -9,6 +9,7 @@ import {
   SidebarMenuButton,
   SidebarGroup,
   SidebarGroupContent,
+  SidebarRail,
 } from "@/components/ui/sidebar";
 import { navItems, filterNavItems } from "@/lib/navigation";
 import { useCurrentUser } from "@/hooks/useUser";
@@ -69,6 +70,7 @@ export function AppSidebar() {
       <SidebarFooter className="border-t">
         <UserMenu />
       </SidebarFooter>
+      <SidebarRail />
     </Sidebar>
   );
 }
