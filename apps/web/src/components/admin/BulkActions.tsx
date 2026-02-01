@@ -1,3 +1,5 @@
+import { Button } from "@/components/ui/button";
+
 interface BulkActionsProps {
   selectedCount: number;
   onActivate: () => void;
@@ -14,17 +16,28 @@ export function BulkActions({
   if (selectedCount === 0) return null;
 
   return (
-    <div className="bulk-actions">
-      <span className="bulk-count">
-        {selectedCount} user{selectedCount > 1 ? 's' : ''} selected
+    <div className="flex items-center gap-4 p-3 bg-primary/5 border border-primary/20 rounded-md">
+      <span className="text-sm font-medium text-foreground">
+        {selectedCount} user{selectedCount > 1 ? "s" : ""} selected
       </span>
-      <div className="bulk-buttons">
-        <button onClick={onActivate} disabled={isLoading} className="btn btn-success btn-sm">
-          {isLoading ? 'Updating...' : 'Activate'}
-        </button>
-        <button onClick={onDeactivate} disabled={isLoading} className="btn btn-secondary btn-sm">
-          {isLoading ? 'Updating...' : 'Deactivate'}
-        </button>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onActivate}
+          disabled={isLoading}
+          className="border-success/50 text-success hover:bg-success/10"
+        >
+          {isLoading ? "Updating..." : "Activate"}
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onDeactivate}
+          disabled={isLoading}
+        >
+          {isLoading ? "Updating..." : "Deactivate"}
+        </Button>
       </div>
     </div>
   );

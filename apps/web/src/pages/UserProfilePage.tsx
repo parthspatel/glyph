@@ -8,6 +8,10 @@ import {
   type UpdateUserRequest,
 } from "../hooks/useUser";
 import { SkillBadges, QualityStats } from "../components/user";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 export function UserProfilePage() {
   const { userId } = useParams<{ userId: string }>();
@@ -24,14 +28,12 @@ export function UserProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="page-container">
-        <div className="loading-skeleton">
-          <div className="skeleton-header">
-            <div className="skeleton-avatar" />
-            <div className="skeleton-text-group">
-              <div className="skeleton-text skeleton-text-lg" />
-              <div className="skeleton-text skeleton-text-sm" />
-            </div>
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex gap-6 items-start">
+          <Skeleton className="size-20 rounded-full" />
+          <div className="space-y-2 flex-1">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-4 w-32" />
           </div>
         </div>
       </div>
@@ -40,8 +42,8 @@ export function UserProfilePage() {
 
   if (error || !user) {
     return (
-      <div className="page-container">
-        <div className="error-banner">
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4">
           Failed to load user profile. Please try again.
         </div>
       </div>
@@ -63,55 +65,95 @@ export function UserProfilePage() {
     setEditForm({});
   };
 
+  const roleColors: Record<string, string> = {
+    admin: "bg-primary/10 text-primary",
+    manager: "bg-info/10 text-info",
+    annotator: "bg-muted text-muted-foreground",
+  };
+
+  const statusColors: Record<string, string> = {
+    active: "bg-success/10 text-success",
+    inactive: "bg-muted text-muted-foreground",
+  };
+
   return (
-    <div className="page-container">
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* Header with avatar and name */}
-      <header className="profile-header">
-        <div className="profile-avatar">
+      <header className="flex gap-6 items-start">
+        <div className="size-20 rounded-full bg-muted flex items-center justify-center text-2xl font-semibold overflow-hidden">
           {user.avatar_url ? (
-            <img src={user.avatar_url} alt={user.display_name} />
+            <img
+              src={user.avatar_url}
+              alt={user.display_name}
+              className="size-full object-cover"
+            />
           ) : (
-            <span className="avatar-placeholder">
+            <span className="text-muted-foreground">
               {user.display_name.charAt(0).toUpperCase()}
             </span>
           )}
         </div>
 
-        <div className="profile-info">
-          <div className="profile-title-row">
-            <h1>{user.display_name}</h1>
-            <span className={`role-badge role-${user.global_role}`}>
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold text-foreground">
+              {user.display_name}
+            </h1>
+            <span
+              className={cn(
+                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                roleColors[user.global_role] || roleColors.annotator,
+              )}
+            >
               {user.global_role}
             </span>
-            <span className={`status-badge status-${user.status}`}>
+            <span
+              className={cn(
+                "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                statusColors[user.status] || statusColors.inactive,
+              )}
+            >
               {user.status}
             </span>
           </div>
-          <p className="profile-email">{user.email}</p>
+          <p className="text-muted-foreground">{user.email}</p>
           {user.department && (
-            <p className="profile-department">{user.department}</p>
+            <p className="text-sm text-muted-foreground">{user.department}</p>
           )}
           {user.timezone && (
-            <p className="profile-timezone">Timezone: {user.timezone}</p>
+            <p className="text-sm text-muted-foreground">
+              Timezone: {user.timezone}
+            </p>
           )}
 
           {canEdit && !isEditing && (
-            <button onClick={() => setIsEditing(true)} className="btn btn-link">
+            <Button
+              variant="link"
+              onClick={() => setIsEditing(true)}
+              className="px-0"
+            >
               Edit Profile
-            </button>
+            </Button>
           )}
         </div>
       </header>
 
       {/* Edit form */}
       {isEditing && (
-        <section className="edit-form-section">
-          <h2>Edit Profile</h2>
+        <section className="bg-card rounded-lg border p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">
+            Edit Profile
+          </h2>
 
-          <div className="form-grid">
-            <div className="form-field">
-              <label htmlFor="display_name">Display Name</label>
-              <input
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label
+                htmlFor="display_name"
+                className="text-sm font-medium text-foreground"
+              >
+                Display Name
+              </label>
+              <Input
                 id="display_name"
                 type="text"
                 defaultValue={user.display_name}
@@ -121,9 +163,14 @@ export function UserProfilePage() {
               />
             </div>
 
-            <div className="form-field">
-              <label htmlFor="department">Department</label>
-              <input
+            <div className="space-y-2">
+              <label
+                htmlFor="department"
+                className="text-sm font-medium text-foreground"
+              >
+                Department
+              </label>
+              <Input
                 id="department"
                 type="text"
                 defaultValue={user.department || ""}
@@ -136,9 +183,14 @@ export function UserProfilePage() {
               />
             </div>
 
-            <div className="form-field">
-              <label htmlFor="timezone">Timezone</label>
-              <input
+            <div className="space-y-2">
+              <label
+                htmlFor="timezone"
+                className="text-sm font-medium text-foreground"
+              >
+                Timezone
+              </label>
+              <Input
                 id="timezone"
                 type="text"
                 defaultValue={user.timezone || ""}
@@ -152,9 +204,14 @@ export function UserProfilePage() {
               />
             </div>
 
-            <div className="form-field">
-              <label htmlFor="avatar_url">Avatar URL</label>
-              <input
+            <div className="space-y-2">
+              <label
+                htmlFor="avatar_url"
+                className="text-sm font-medium text-foreground"
+              >
+                Avatar URL
+              </label>
+              <Input
                 id="avatar_url"
                 type="url"
                 defaultValue={user.avatar_url || ""}
@@ -168,8 +225,13 @@ export function UserProfilePage() {
               />
             </div>
 
-            <div className="form-field form-field-full">
-              <label htmlFor="bio">Bio</label>
+            <div className="space-y-2 md:col-span-2">
+              <label
+                htmlFor="bio"
+                className="text-sm font-medium text-foreground"
+              >
+                Bio
+              </label>
               <textarea
                 id="bio"
                 defaultValue={user.bio || ""}
@@ -181,38 +243,37 @@ export function UserProfilePage() {
                 }
                 rows={3}
                 placeholder="Tell us about yourself..."
+                className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:border-ring disabled:cursor-not-allowed disabled:opacity-50"
               />
             </div>
           </div>
 
           {updateUser.error && (
-            <div className="error-banner">{updateUser.error.message}</div>
+            <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4">
+              {updateUser.error.message}
+            </div>
           )}
 
-          <div className="form-actions">
-            <button
-              onClick={handleSave}
-              disabled={updateUser.isPending}
-              className="btn btn-primary"
-            >
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={updateUser.isPending}>
               {updateUser.isPending ? "Saving..." : "Save Changes"}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
               onClick={handleCancel}
               disabled={updateUser.isPending}
-              className="btn btn-secondary"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </section>
       )}
 
       {/* Bio section */}
       {user.bio && !isEditing && (
-        <section className="profile-section">
-          <h2>About</h2>
-          <p className="bio-text">{user.bio}</p>
+        <section className="bg-card rounded-lg border p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-foreground">About</h2>
+          <p className="text-foreground">{user.bio}</p>
         </section>
       )}
 
@@ -221,25 +282,29 @@ export function UserProfilePage() {
         (user.contact_info.phone ||
           user.contact_info.slack_handle ||
           user.contact_info.office_location) && (
-          <section className="profile-section">
-            <h2>Contact</h2>
-            <dl className="contact-list">
+          <section className="bg-card rounded-lg border p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-foreground">Contact</h2>
+            <dl>
               {user.contact_info.phone && (
-                <div className="contact-item">
-                  <dt>Phone</dt>
-                  <dd>{user.contact_info.phone}</dd>
+                <div className="flex justify-between py-2 border-b border-border last:border-0">
+                  <dt className="text-muted-foreground">Phone</dt>
+                  <dd className="text-foreground">{user.contact_info.phone}</dd>
                 </div>
               )}
               {user.contact_info.slack_handle && (
-                <div className="contact-item">
-                  <dt>Slack</dt>
-                  <dd>{user.contact_info.slack_handle}</dd>
+                <div className="flex justify-between py-2 border-b border-border last:border-0">
+                  <dt className="text-muted-foreground">Slack</dt>
+                  <dd className="text-foreground">
+                    {user.contact_info.slack_handle}
+                  </dd>
                 </div>
               )}
               {user.contact_info.office_location && (
-                <div className="contact-item">
-                  <dt>Office</dt>
-                  <dd>{user.contact_info.office_location}</dd>
+                <div className="flex justify-between py-2 border-b border-border last:border-0">
+                  <dt className="text-muted-foreground">Office</dt>
+                  <dd className="text-foreground">
+                    {user.contact_info.office_location}
+                  </dd>
                 </div>
               )}
             </dl>
@@ -247,19 +312,23 @@ export function UserProfilePage() {
         )}
 
       {/* Skills section */}
-      <section className="profile-section">
-        <h2>Skills & Certifications</h2>
+      <section className="bg-card rounded-lg border p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-foreground">
+          Skills & Certifications
+        </h2>
         <SkillBadges skills={skills || []} />
       </section>
 
       {/* Quality metrics section */}
-      <section className="profile-section">
-        <h2>Quality Metrics</h2>
+      <section className="bg-card rounded-lg border p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-foreground">
+          Quality Metrics
+        </h2>
         <QualityStats profile={user.quality_profile} />
       </section>
 
       {/* Metadata footer */}
-      <footer className="profile-footer">
+      <footer className="text-sm text-muted-foreground space-y-1">
         <p>Member since {new Date(user.created_at).toLocaleDateString()}</p>
         <p>Last updated {new Date(user.updated_at).toLocaleDateString()}</p>
       </footer>

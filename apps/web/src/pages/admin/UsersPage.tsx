@@ -1,13 +1,15 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import type { RowSelectionState } from '@tanstack/react-table';
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import type { RowSelectionState } from "@tanstack/react-table";
 import {
   useUsers,
   useCreateUser,
   useBulkUpdateUsers,
   type CreateUserRequest,
-} from '../../hooks/useUsers';
-import { UserTable, BulkActions } from '../../components/admin';
+} from "../../hooks/useUsers";
+import { UserTable, BulkActions } from "../../components/admin";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export function AdminUsersPage() {
   const navigate = useNavigate();
@@ -17,23 +19,28 @@ export function AdminUsersPage() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const pageSize = 20;
-  const { data, isLoading, error } = useUsers({ limit: pageSize, offset: page * pageSize });
+  const { data, isLoading, error } = useUsers({
+    limit: pageSize,
+    offset: page * pageSize,
+  });
   const createUser = useCreateUser();
   const bulkUpdate = useBulkUpdateUsers();
 
-  const selectedIds = Object.keys(rowSelection).filter((id) => rowSelection[id]);
+  const selectedIds = Object.keys(rowSelection).filter(
+    (id) => rowSelection[id],
+  );
 
   const handleBulkActivate = () => {
     bulkUpdate.mutate(
-      { userIds: selectedIds, update: { status: 'active' } },
-      { onSuccess: () => setRowSelection({}) }
+      { userIds: selectedIds, update: { status: "active" } },
+      { onSuccess: () => setRowSelection({}) },
     );
   };
 
   const handleBulkDeactivate = () => {
     bulkUpdate.mutate(
-      { userIds: selectedIds, update: { status: 'inactive' } },
-      { onSuccess: () => setRowSelection({}) }
+      { userIds: selectedIds, update: { status: "inactive" } },
+      { onSuccess: () => setRowSelection({}) },
     );
   };
 
@@ -43,14 +50,14 @@ export function AdminUsersPage() {
 
     const formData = new FormData(e.currentTarget);
     const userData: CreateUserRequest = {
-      email: formData.get('email') as string,
-      display_name: formData.get('display_name') as string,
+      email: formData.get("email") as string,
+      display_name: formData.get("display_name") as string,
     };
 
-    const department = formData.get('department') as string;
+    const department = formData.get("department") as string;
     if (department) userData.department = department;
 
-    const role = formData.get('global_role') as string;
+    const role = formData.get("global_role") as string;
     if (role) userData.global_role = role;
 
     try {
@@ -58,23 +65,25 @@ export function AdminUsersPage() {
       setShowCreateModal(false);
       (e.target as HTMLFormElement).reset();
     } catch (err) {
-      setCreateError(err instanceof Error ? err.message : 'Failed to create user');
+      setCreateError(
+        err instanceof Error ? err.message : "Failed to create user",
+      );
     }
   };
 
   const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
 
   return (
-    <div className="page-container">
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header */}
-      <header className="page-header">
+      <header className="flex items-center justify-between">
         <div>
-          <h1>User Management</h1>
-          <p className="page-subtitle">{data ? `${data.total} total users` : 'Loading...'}</p>
+          <h1 className="text-2xl font-bold text-foreground">Users</h1>
+          <p className="text-muted-foreground">
+            {data ? `${data.total} total users` : "Loading..."}
+          </p>
         </div>
-        <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
-          Create User
-        </button>
+        <Button onClick={() => setShowCreateModal(true)}>Create User</Button>
       </header>
 
       {/* Bulk Actions */}
@@ -86,14 +95,22 @@ export function AdminUsersPage() {
       />
 
       {/* Error State */}
-      {error && <div className="error-banner">Failed to load users. Please try again.</div>}
+      {error && (
+        <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4">
+          Failed to load users. Please try again.
+        </div>
+      )}
 
       {/* Loading State */}
-      {isLoading && <div className="loading-state">Loading users...</div>}
+      {isLoading && (
+        <div className="text-center py-8 text-muted-foreground">
+          Loading users...
+        </div>
+      )}
 
       {/* User Table */}
       {data && !isLoading && (
-        <div className="table-card">
+        <div className="bg-card rounded-lg border overflow-hidden">
           <UserTable
             users={data.items}
             rowSelection={rowSelection}
@@ -105,93 +122,132 @@ export function AdminUsersPage() {
 
       {/* Pagination */}
       {data && data.total > pageSize && (
-        <div className="pagination">
-          <span className="pagination-info">
-            Showing {data.offset + 1} - {Math.min(data.offset + data.limit, data.total)} of{' '}
-            {data.total}
+        <div className="flex items-center justify-between pt-4">
+          <span className="text-sm text-muted-foreground">
+            Showing {data.offset + 1} -{" "}
+            {Math.min(data.offset + data.limit, data.total)} of {data.total}
           </span>
-          <div className="pagination-buttons">
-            <button
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="btn btn-outline btn-sm"
             >
               Previous
-            </button>
-            <span className="pagination-page">
+            </Button>
+            <span className="text-sm text-muted-foreground px-2">
               Page {page + 1} of {totalPages}
             </span>
-            <button
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setPage((p) => p + 1)}
               disabled={page + 1 >= totalPages}
-              className="btn btn-outline btn-sm"
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {/* Create User Modal */}
       {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Create User</h2>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={() => setShowCreateModal(false)}
+        >
+          <div
+            className="bg-card rounded-lg border shadow-lg p-6 max-w-md w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              Create User
+            </h2>
 
-            <form onSubmit={handleCreateUser}>
-              <div className="form-fields">
-                <div className="form-field">
-                  <label htmlFor="email">Email *</label>
-                  <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    required
-                    placeholder="user@example.com"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="display_name">Display Name *</label>
-                  <input
-                    id="display_name"
-                    name="display_name"
-                    type="text"
-                    required
-                    placeholder="John Doe"
-                  />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="department">Department</label>
-                  <input id="department" name="department" type="text" placeholder="Engineering" />
-                </div>
-
-                <div className="form-field">
-                  <label htmlFor="global_role">Role</label>
-                  <select id="global_role" name="global_role">
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="email"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Email *
+                </label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  placeholder="user@example.com"
+                />
               </div>
 
-              {createError && <div className="error-banner">{createError}</div>}
+              <div className="space-y-2">
+                <label
+                  htmlFor="display_name"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Display Name *
+                </label>
+                <Input
+                  id="display_name"
+                  name="display_name"
+                  type="text"
+                  required
+                  placeholder="John Doe"
+                />
+              </div>
 
-              <div className="modal-actions">
-                <button type="submit" disabled={createUser.isPending} className="btn btn-primary">
-                  {createUser.isPending ? 'Creating...' : 'Create User'}
-                </button>
-                <button
+              <div className="space-y-2">
+                <label
+                  htmlFor="department"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Department
+                </label>
+                <Input
+                  id="department"
+                  name="department"
+                  type="text"
+                  placeholder="Engineering"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label
+                  htmlFor="global_role"
+                  className="text-sm font-medium text-foreground"
+                >
+                  Role
+                </label>
+                <select
+                  id="global_role"
+                  name="global_role"
+                  className="w-full h-9 px-3 py-1 rounded-md border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+
+              {createError && (
+                <div className="text-sm text-destructive">{createError}</div>
+              )}
+
+              <div className="flex justify-end gap-3 mt-6">
+                <Button
                   type="button"
+                  variant="secondary"
                   onClick={() => {
                     setShowCreateModal(false);
                     setCreateError(null);
                   }}
-                  className="btn btn-secondary"
                 >
                   Cancel
-                </button>
+                </Button>
+                <Button type="submit" disabled={createUser.isPending}>
+                  {createUser.isPending ? "Creating..." : "Create User"}
+                </Button>
               </div>
             </form>
           </div>
