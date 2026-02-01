@@ -1,7 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 
 // Layout
-import { AppLayout } from "./components/layout";
+import { AppLayout, ProtectedRoute } from "./components/layout";
 
 // Pages
 import { HomePage } from "./pages/HomePage";
@@ -28,9 +28,13 @@ export function App() {
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/annotate/:taskId" element={<AnnotatePage />} />
         <Route path="/users/:userId" element={<UserProfilePage />} />
-        <Route path="/admin/users" element={<AdminUsersPage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailPage />} />
+
+        {/* Admin-only routes */}
+        <Route element={<ProtectedRoute requiredRoles={["admin"]} />}>
+          <Route path="/admin/users" element={<AdminUsersPage />} />
+        </Route>
       </Route>
     </Routes>
   );
