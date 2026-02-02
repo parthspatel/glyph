@@ -3,36 +3,50 @@
  * Includes view toggle, search, status filter, and type filter.
  */
 
-import { useSearchParams } from 'react-router-dom';
-import { useMemo, useCallback, useEffect, useState } from 'react';
-import type { ProjectFilter, ProjectStatus } from '../../api/projects';
+import { useSearchParams } from "react-router-dom";
+import { useMemo, useCallback, useEffect, useState } from "react";
+import { Search, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { ProjectFilter, ProjectStatus } from "../../api/projects";
 
-type ViewType = 'my' | 'team' | 'all';
+type ViewType = "my" | "team" | "all";
 
 interface ProjectFiltersProps {
   filter: ProjectFilter;
   onFilterChange: (filter: ProjectFilter) => void;
 }
 
-const STATUS_OPTIONS: { value: ProjectStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'All Status' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'active', label: 'Active' },
-  { value: 'paused', label: 'Paused' },
-  { value: 'completed', label: 'Completed' },
-  { value: 'archived', label: 'Archived' },
+const STATUS_OPTIONS: { value: ProjectStatus | "all"; label: string }[] = [
+  { value: "all", label: "All Status" },
+  { value: "draft", label: "Draft" },
+  { value: "active", label: "Active" },
+  { value: "paused", label: "Paused" },
+  { value: "completed", label: "Completed" },
+  { value: "archived", label: "Archived" },
 ];
 
-export function ProjectFilters({ filter, onFilterChange }: ProjectFiltersProps) {
+const VIEW_OPTIONS: { value: ViewType; label: string }[] = [
+  { value: "my", label: "My Projects" },
+  { value: "team", label: "Team" },
+  { value: "all", label: "All" },
+];
+
+export function ProjectFilters({
+  filter,
+  onFilterChange,
+}: ProjectFiltersProps) {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [searchInput, setSearchInput] = useState(filter.search ?? '');
+  const [searchInput, setSearchInput] = useState(filter.search ?? "");
 
   // Sync URL params to filter
-  const urlFilter = useMemo((): ProjectFilter => ({
-    status: (searchParams.get('status') as ProjectStatus) || undefined,
-    search: searchParams.get('search') || undefined,
-    project_type_id: searchParams.get('type') || undefined,
-  }), [searchParams]);
+  const urlFilter = useMemo(
+    (): ProjectFilter => ({
+      status: (searchParams.get("status") as ProjectStatus) || undefined,
+      search: searchParams.get("search") || undefined,
+      project_type_id: searchParams.get("type") || undefined,
+    }),
+    [searchParams],
+  );
 
   // Update parent when URL changes
   useEffect(() => {
@@ -42,93 +56,90 @@ export function ProjectFilters({ filter, onFilterChange }: ProjectFiltersProps) 
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (searchInput !== (filter.search ?? '')) {
+      if (searchInput !== (filter.search ?? "")) {
         updateParams({ search: searchInput || null });
       }
     }, 300);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  const updateParams = useCallback((updates: Record<string, string | null>) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === null || value === '') {
-          newParams.delete(key);
-        } else {
-          newParams.set(key, value);
-        }
+  const updateParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value === null || value === "") {
+            newParams.delete(key);
+          } else {
+            newParams.set(key, value);
+          }
+        });
+        return newParams;
       });
-      return newParams;
-    });
-  }, [setSearchParams]);
+    },
+    [setSearchParams],
+  );
 
-  const currentView = (searchParams.get('view') as ViewType) ?? 'all';
+  const currentView = (searchParams.get("view") as ViewType) ?? "all";
 
   const handleViewChange = (view: ViewType) => {
-    updateParams({ view: view === 'all' ? null : view });
+    updateParams({ view: view === "all" ? null : view });
   };
 
   const handleStatusChange = (status: string) => {
-    updateParams({ status: status === 'all' ? null : status });
+    updateParams({ status: status === "all" ? null : status });
   };
 
   return (
-    <div className="project-filters">
+    <div className="flex flex-wrap items-center gap-4">
       {/* View toggle */}
-      <div className="view-toggle">
-        <button
-          className={`view-toggle-btn ${currentView === 'my' ? 'active' : ''}`}
-          onClick={() => handleViewChange('my')}
-        >
-          My Projects
-        </button>
-        <button
-          className={`view-toggle-btn ${currentView === 'team' ? 'active' : ''}`}
-          onClick={() => handleViewChange('team')}
-        >
-          Team
-        </button>
-        <button
-          className={`view-toggle-btn ${currentView === 'all' ? 'active' : ''}`}
-          onClick={() => handleViewChange('all')}
-        >
-          All
-        </button>
+      <div className="flex items-center rounded-lg border border-input bg-muted/30 p-0.5">
+        {VIEW_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            className={cn(
+              "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
+              currentView === opt.value
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() => handleViewChange(opt.value)}
+          >
+            {opt.label}
+          </button>
+        ))}
       </div>
 
       {/* Search */}
-      <div className="search-input-wrapper">
-        <svg className="search-icon" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-        </svg>
+      <div className="relative flex-1 max-w-sm">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
         <input
           type="text"
           placeholder="Search projects..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          className="search-input"
+          className="w-full pl-9 pr-8 py-2 rounded-md border border-input bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         />
         {searchInput && (
           <button
-            className="search-clear"
+            className="absolute right-2 top-1/2 -translate-y-1/2 size-5 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
             onClick={() => {
-              setSearchInput('');
+              setSearchInput("");
               updateParams({ search: null });
             }}
           >
-            ×
+            <X className="size-3" />
           </button>
         )}
       </div>
 
       {/* Status filter */}
       <select
-        value={filter.status ?? 'all'}
+        value={filter.status ?? "all"}
         onChange={(e) => handleStatusChange(e.target.value)}
-        className="filter-select"
+        className="px-3 py-2 rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
       >
-        {STATUS_OPTIONS.map(opt => (
+        {STATUS_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
             {opt.label}
           </option>
@@ -145,27 +156,37 @@ export function ProjectFilters({ filter, onFilterChange }: ProjectFiltersProps) 
 export function useProjectFilters() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const filter = useMemo((): ProjectFilter => ({
-    status: (searchParams.get('status') as ProjectStatus) || undefined,
-    search: searchParams.get('search') || undefined,
-    project_type_id: searchParams.get('type') || undefined,
-    limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20,
-    offset: searchParams.get('offset') ? parseInt(searchParams.get('offset')!) : 0,
-  }), [searchParams]);
+  const filter = useMemo(
+    (): ProjectFilter => ({
+      status: (searchParams.get("status") as ProjectStatus) || undefined,
+      search: searchParams.get("search") || undefined,
+      project_type_id: searchParams.get("type") || undefined,
+      limit: searchParams.get("limit")
+        ? parseInt(searchParams.get("limit")!)
+        : 20,
+      offset: searchParams.get("offset")
+        ? parseInt(searchParams.get("offset")!)
+        : 0,
+    }),
+    [searchParams],
+  );
 
-  const setFilter = useCallback((updates: Partial<ProjectFilter>) => {
-    setSearchParams(prev => {
-      const newParams = new URLSearchParams(prev);
-      Object.entries(updates).forEach(([key, value]) => {
-        if (value === undefined || value === null) {
-          newParams.delete(key);
-        } else {
-          newParams.set(key, String(value));
-        }
+  const setFilter = useCallback(
+    (updates: Partial<ProjectFilter>) => {
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value === undefined || value === null) {
+            newParams.delete(key);
+          } else {
+            newParams.set(key, String(value));
+          }
+        });
+        return newParams;
       });
-      return newParams;
-    });
-  }, [setSearchParams]);
+    },
+    [setSearchParams],
+  );
 
   return { filter, setFilter };
 }
