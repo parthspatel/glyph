@@ -25,6 +25,7 @@ petgraph.workspace = true
 serde_yml.workspace = true
 backoff.workspace = true
 strsim.workspace = true
+sqlx.workspace = true
 
 [lints]
 workspace = true
