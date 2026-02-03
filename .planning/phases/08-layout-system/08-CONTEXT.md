@@ -44,7 +44,7 @@ Nunjucks template rendering with a component library for building annotation int
 - **Global shortcut registry** — Layout defines all shortcuts in one place, components receive bindings as props. Components still have `enableHotkeys` prop (per PRD) but bindings come from registry. No conflicts, consistent across layouts.
 - **Rich selection in NERTagger** — Click-drag for quick selections, double-click for word, shift-click for extending, configurable token-level snapping
 - **Configurable entity overlaps** — `allowOverlapping={true|false}` prop, default to no overlap
-- **Layout-level undo stack** — Single undo history for entire annotation output. Components can implement custom undo/redo for complex interactions that hooks into layout-level actions.
+- **Layout-level undo stack with WASM interface** — Single undo history for entire annotation output. Undo/redo must be part of the stable WASM interface: components receive `onUndo`/`onRedo` callbacks and can emit `requestUndo`/`requestRedo` events. Components can implement custom undo/redo for complex interactions that hooks into layout-level actions via this interface.
 - **Hybrid validation feedback** — Required field indicators always visible, detailed validation on blur/submit, configurable per-field
 - **Configurable AI suggestion mode** — Layout chooses: `aiMode="auto-accept"`, `aiMode="explicit"`, or `aiMode="off"`
 - **Configurable confidence display** — Layout chooses whether/how to show ML confidence (hidden, visual cues, or explicit scores)
