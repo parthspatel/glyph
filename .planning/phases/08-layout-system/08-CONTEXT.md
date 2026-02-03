@@ -8,7 +8,13 @@
 
 Nunjucks template rendering with a component library for building annotation interfaces. This phase delivers the runtime that renders layouts from templates, the component registry, base annotation components (NERTagger, Classification, BoundingBox, etc.), layout primitives, form/display components, data binding, schema validation, versioning, and the layout preview tool.
 
-**Note:** The three-tier architecture (Tier 1: React components, Tier 2: Nunjucks templates, Tier 3: ML services), Nunjucks as primary format, data binding model (`input`, `output`, `context`, `config`, `user`), and security constraints are already defined in the PRD §5.
+**Note:** The following are already defined in PRD §5 and should be followed exactly:
+- Three-tier architecture (Tier 1: React components, Tier 2: Nunjucks/MDX/TSX templates, Tier 3: ML services)
+- Template formats: Nunjucks (primary), MDX, TSX
+- Data binding model: `input`, `output`, `context`, `config`, `user` variables
+- Security constraints: allowedComponents, bindingPathPattern, expressionAllowlist, maxDepth, maxIterations
+- Component library structure: annotation/, layout/, form/, display/, control/
+- LayoutSettings model with auto_save, keyboard_shortcuts, etc.
 
 </domain>
 
@@ -25,14 +31,15 @@ Nunjucks template rendering with a component library for building annotation int
 - **State as output (opt-in) + optional ref for actions** — Internal state exposed declaratively via output props when needed; refs available for imperative methods (scroll, focus, clear). Default: components manage state internally, no output emitted unless explicitly wired.
 
 ### Layout Composition Model
-- **Nunjucks templates as defined in PRD** — Primary format with Jinja-like syntax, already specified
+- **Three template formats per PRD** — Nunjucks (primary, Jinja-like), MDX (content-heavy with Markdown), TSX (complex layouts requiring full React)
 - **Monaco editor integration** — Template editing uses Monaco with inline error highlighting (squiggles, gutter markers)
 - **Inline error display in preview** — Errors render where the broken component would be, with stack trace
 - **Three data sources for preview** — Manual JSON entry for quick tests, schema-generated mocks for convenience, real task snapshots for realistic testing
 - **Versioning per PRD** — Immutable published layouts, draft/published/deprecated lifecycle, tasks keep the version they started with
+- **LayoutSettings per PRD** — auto_save, auto_save_interval, show_progress, keyboard_shortcuts, confirm_submit, allow_skip, custom_css as defined in PRD §5.2
 
 ### Annotation Component Behavior
-- **Global shortcut registry** — Layout defines all shortcuts in one place, components receive bindings as props. No conflicts, consistent across layouts.
+- **Global shortcut registry** — Layout defines all shortcuts in one place, components receive bindings as props. Components still have `enableHotkeys` prop (per PRD) but bindings come from registry. No conflicts, consistent across layouts.
 - **Rich selection in NERTagger** — Click-drag for quick selections, double-click for word, shift-click for extending, configurable token-level snapping
 - **Configurable entity overlaps** — `allowOverlapping={true|false}` prop, default to no overlap
 - **Layout-level undo stack** — Single undo history for entire annotation output. Components can implement custom undo/redo for complex interactions that hooks into layout-level actions.
