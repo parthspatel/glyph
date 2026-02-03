@@ -21,6 +21,11 @@ uuid.workspace = true
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+petgraph.workspace = true
+serde_yml.workspace = true
+backoff.workspace = true
+strsim.workspace = true
+sqlx.workspace = true
 
 [lints]
 workspace = true
