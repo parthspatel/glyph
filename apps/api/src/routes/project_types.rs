@@ -4,12 +4,17 @@ use axum::{
     extract::{Path, Query},
     http::StatusCode,
     routing::{delete, get, post},
-    Json, Router,
+    Extension, Json, Router,
 };
 use serde::{Deserialize, Serialize};
+use sqlx::PgPool;
 use utoipa::ToSchema;
 
-use glyph_domain::{ProjectTypeId, SkillRequirement};
+use glyph_db::{PgProjectTypeRepository, ProjectTypeRepository};
+use glyph_domain::{
+    CreateProjectType, DifficultyLevel, ProficiencyLevel, ProjectType, ProjectTypeFilter,
+    ProjectTypeId, SkillRequirement, UpdateProjectType,
+};
 
 use crate::error::ApiError;
 use crate::extractors::CurrentUser;
@@ -51,6 +56,30 @@ pub struct ProjectTypeResponse {
     pub usage_count: i64,
 }
 
+impl From<ProjectType> for ProjectTypeResponse {
+    fn from(pt: ProjectType) -> Self {
+        Self {
+            project_type_id: pt.project_type_id.to_string(),
+            name: pt.name,
+            description: pt.description,
+            input_schema: pt.input_schema,
+            output_schema: pt.output_schema,
+            estimated_duration_seconds: pt.estimated_duration_seconds,
+            difficulty_level: pt.difficulty_level.map(format_difficulty),
+            skill_requirements: pt
+                .skill_requirements
+                .into_iter()
+                .map(SkillRequirementResponse::from)
+                .collect(),
+            is_system: pt.is_system,
+            created_by: pt.created_by.map(|u| u.to_string()),
+            created_at: pt.created_at.to_rfc3339(),
+            updated_at: pt.updated_at.to_rfc3339(),
+            usage_count: 0, // TODO: compute from projects table
+        }
+    }
+}
+
 /// Skill requirement response
 #[derive(Debug, Serialize, ToSchema)]
 pub struct SkillRequirementResponse {
@@ -64,7 +93,7 @@ impl From<SkillRequirement> for SkillRequirementResponse {
     fn from(sr: SkillRequirement) -> Self {
         Self {
             skill_id: sr.skill_id,
-            min_proficiency: format!("{:?}", sr.min_proficiency).to_lowercase(),
+            min_proficiency: format_proficiency(sr.min_proficiency),
             is_required: sr.is_required,
             weight: sr.weight,
         }
@@ -181,14 +210,30 @@ pub fn routes() -> Router {
 async fn list_project_types(
     Query(params): Query<ListProjectTypesQuery>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<Json<ProjectTypeListResponse>, ApiError> {
     let limit = params.limit.unwrap_or(20);
     let offset = params.offset.unwrap_or(0);
 
-    // Placeholder - will implement with actual DB query
+    let filter = ProjectTypeFilter {
+        is_system: params.is_system,
+        created_by: None,
+        search: params.search,
+        limit: Some(limit),
+        offset: Some(offset),
+    };
+
+    let repo = PgProjectTypeRepository::new(pool);
+    let items = repo.list(&filter).await.map_err(|e| {
+        tracing::error!("Failed to list project types: {:?}", e);
+        ApiError::Internal(anyhow::anyhow!("{}", e))
+    })?;
+
+    let total = items.len() as i64; // TODO: add count method to repository
+
     Ok(Json(ProjectTypeListResponse {
-        items: vec![],
-        total: 0,
+        items: items.into_iter().map(ProjectTypeResponse::from).collect(),
+        total,
         limit,
         offset,
     }))
@@ -210,13 +255,23 @@ async fn list_project_types(
 async fn get_project_type(
     Path(project_type_id): Path<String>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<Json<ProjectTypeResponse>, ApiError> {
-    let _id: ProjectTypeId = project_type_id
+    let id: ProjectTypeId = project_type_id
         .parse()
         .map_err(|_| ApiError::not_found("project_type", &project_type_id))?;
 
-    // Placeholder
-    Err(ApiError::not_found("project_type", &project_type_id))
+    let repo = PgProjectTypeRepository::new(pool);
+    let project_type = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to find project type {}: {:?}", project_type_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
+        .ok_or_else(|| ApiError::not_found("project_type", &project_type_id))?;
+
+    Ok(Json(ProjectTypeResponse::from(project_type)))
 }
 
 /// Create a new project type
@@ -232,6 +287,7 @@ async fn get_project_type(
 )]
 async fn create_project_type(
     current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
     Json(req): Json<CreateProjectTypeRequest>,
 ) -> Result<(StatusCode, Json<ProjectTypeResponse>), ApiError> {
     // Validate name
@@ -250,36 +306,46 @@ async fn create_project_type(
         validate_json_schema(schema)?;
     }
 
-    // Placeholder response
-    let response = ProjectTypeResponse {
-        project_type_id: ProjectTypeId::new().to_string(),
+    // Build domain CreateProjectType
+    let create = CreateProjectType {
         name: req.name,
         description: req.description,
-        input_schema: req.input_schema.unwrap_or(serde_json::json!({})),
-        output_schema: req.output_schema.unwrap_or(serde_json::json!({})),
+        input_schema: req.input_schema,
+        output_schema: req.output_schema,
         estimated_duration_seconds: req.estimated_duration_seconds,
-        difficulty_level: req.difficulty_level,
-        skill_requirements: req
-            .skill_requirements
-            .map(|reqs| {
-                reqs.into_iter()
-                    .map(|r| SkillRequirementResponse {
-                        skill_id: r.skill_id,
-                        min_proficiency: r.min_proficiency,
-                        is_required: r.is_required.unwrap_or(true),
-                        weight: r.weight.unwrap_or(1.0),
-                    })
-                    .collect()
-            })
-            .unwrap_or_default(),
-        is_system: false,
-        created_by: Some(current_user.user_id.to_string()),
-        created_at: chrono::Utc::now().to_rfc3339(),
-        updated_at: chrono::Utc::now().to_rfc3339(),
-        usage_count: 0,
+        difficulty_level: req.difficulty_level.and_then(|s| parse_difficulty(&s)),
+        skill_requirements: req.skill_requirements.map(|reqs| {
+            reqs.into_iter()
+                .map(|r| SkillRequirement {
+                    skill_id: r.skill_id,
+                    min_proficiency: parse_proficiency(&r.min_proficiency),
+                    is_required: r.is_required.unwrap_or(true),
+                    weight: r.weight.unwrap_or(1.0),
+                })
+                .collect()
+        }),
+        is_system: Some(false),
     };
 
-    Ok((StatusCode::CREATED, Json(response)))
+    let repo = PgProjectTypeRepository::new(pool);
+    let project_type = repo
+        .create(&create, Some(&current_user.user_id))
+        .await
+        .map_err(|e| match e {
+            glyph_db::CreateProjectTypeError::NameExists(name) => ApiError::bad_request(
+                "validation.name_exists",
+                format!("Project type name already exists: {}", name),
+            ),
+            glyph_db::CreateProjectTypeError::Database(e) => {
+                tracing::error!("Failed to create project type: {:?}", e);
+                ApiError::Internal(anyhow::anyhow!("{}", e))
+            }
+        })?;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(ProjectTypeResponse::from(project_type)),
+    ))
 }
 
 /// Update a project type
@@ -299,14 +365,42 @@ async fn create_project_type(
 async fn update_project_type(
     Path(project_type_id): Path<String>,
     _current_user: CurrentUser,
-    Json(_req): Json<UpdateProjectTypeRequest>,
+    Extension(pool): Extension<PgPool>,
+    Json(req): Json<UpdateProjectTypeRequest>,
 ) -> Result<Json<ProjectTypeResponse>, ApiError> {
-    let _id: ProjectTypeId = project_type_id
+    let id: ProjectTypeId = project_type_id
         .parse()
         .map_err(|_| ApiError::not_found("project_type", &project_type_id))?;
 
-    // Placeholder
-    Err(ApiError::not_found("project_type", &project_type_id))
+    // Validate schemas if provided
+    if let Some(schema) = &req.input_schema {
+        validate_json_schema(schema)?;
+    }
+    if let Some(schema) = &req.output_schema {
+        validate_json_schema(schema)?;
+    }
+
+    let update = UpdateProjectType {
+        name: req.name,
+        description: req.description,
+        input_schema: req.input_schema,
+        output_schema: req.output_schema,
+        estimated_duration_seconds: req.estimated_duration_seconds,
+        difficulty_level: req.difficulty_level.and_then(|s| parse_difficulty(&s)),
+    };
+
+    let repo = PgProjectTypeRepository::new(pool);
+    let project_type = repo.update(&id, &update).await.map_err(|e| match e {
+        glyph_db::UpdateProjectTypeError::NotFound(_) => {
+            ApiError::not_found("project_type", &project_type_id)
+        }
+        glyph_db::UpdateProjectTypeError::Database(e) => {
+            tracing::error!("Failed to update project type: {:?}", e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        }
+    })?;
+
+    Ok(Json(ProjectTypeResponse::from(project_type)))
 }
 
 /// Delete a project type
@@ -326,13 +420,27 @@ async fn update_project_type(
 async fn delete_project_type(
     Path(project_type_id): Path<String>,
     _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
 ) -> Result<StatusCode, ApiError> {
-    let _id: ProjectTypeId = project_type_id
+    let id: ProjectTypeId = project_type_id
         .parse()
         .map_err(|_| ApiError::not_found("project_type", &project_type_id))?;
 
-    // Placeholder - will check if type is in use before deleting
-    Err(ApiError::not_found("project_type", &project_type_id))
+    let repo = PgProjectTypeRepository::new(pool);
+    repo.delete(&id).await.map_err(|e| match e {
+        glyph_db::DeleteProjectTypeError::NotFound(_) => {
+            ApiError::not_found("project_type", &project_type_id)
+        }
+        glyph_db::DeleteProjectTypeError::InUse => {
+            ApiError::conflict("project_type.in_use", "Project type is in use by projects")
+        }
+        glyph_db::DeleteProjectTypeError::Database(e) => {
+            tracing::error!("Failed to delete project type: {:?}", e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        }
+    })?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
 
 /// Validate schema against sample data
@@ -429,15 +537,35 @@ async fn infer_schema(
 )]
 async fn add_skill_requirement(
     Path(project_type_id): Path<String>,
+    Extension(pool): Extension<PgPool>,
     _current_user: CurrentUser,
-    Json(_req): Json<SkillRequirementRequest>,
+    Json(req): Json<SkillRequirementRequest>,
 ) -> Result<StatusCode, ApiError> {
-    let _id: ProjectTypeId = project_type_id
+    let id: ProjectTypeId = project_type_id
         .parse()
         .map_err(|_| ApiError::not_found("project_type", &project_type_id))?;
 
-    // Placeholder
-    Err(ApiError::not_found("project_type", &project_type_id))
+    let requirement = SkillRequirement {
+        skill_id: req.skill_id,
+        min_proficiency: parse_proficiency(&req.min_proficiency),
+        is_required: req.is_required.unwrap_or(true),
+        weight: req.weight.unwrap_or(1.0),
+    };
+
+    let repo = PgProjectTypeRepository::new(pool);
+    repo.add_skill_requirement(&id, &requirement)
+        .await
+        .map_err(|e| match e {
+            glyph_db::AddSkillRequirementError::ProjectTypeNotFound => {
+                ApiError::not_found("project_type", &project_type_id)
+            }
+            glyph_db::AddSkillRequirementError::Database(e) => {
+                tracing::error!("Failed to add skill requirement: {:?}", e);
+                ApiError::Internal(anyhow::anyhow!("{}", e))
+            }
+        })?;
+
+    Ok(StatusCode::CREATED)
 }
 
 /// Remove skill requirement from project type
@@ -455,16 +583,33 @@ async fn add_skill_requirement(
     tag = "project-types"
 )]
 async fn remove_skill_requirement(
-    Path((project_type_id, _skill_id)): Path<(String, String)>,
+    Path((project_type_id, skill_id)): Path<(String, String)>,
+    Extension(pool): Extension<PgPool>,
     _current_user: CurrentUser,
 ) -> Result<StatusCode, ApiError> {
-    let _id: ProjectTypeId = project_type_id
+    let id: ProjectTypeId = project_type_id
         .parse()
         .map_err(|_| ApiError::not_found("project_type", &project_type_id))?;
 
-    // Placeholder
-    Err(ApiError::not_found("project_type", &project_type_id))
+    let repo = PgProjectTypeRepository::new(pool);
+    repo.remove_skill_requirement(&id, &skill_id)
+        .await
+        .map_err(|e| match e {
+            glyph_db::RemoveSkillRequirementError::NotFound => {
+                ApiError::not_found("skill_requirement", &skill_id)
+            }
+            glyph_db::RemoveSkillRequirementError::Database(e) => {
+                tracing::error!("Failed to remove skill requirement: {:?}", e);
+                ApiError::Internal(anyhow::anyhow!("{}", e))
+            }
+        })?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
+
+// =============================================================================
+// Helper functions
+// =============================================================================
 
 /// Validate that a value is a valid JSON Schema
 fn validate_json_schema(schema: &serde_json::Value) -> Result<(), ApiError> {
@@ -481,4 +626,42 @@ fn validate_json_schema(schema: &serde_json::Value) -> Result<(), ApiError> {
         .map_err(|e| ApiError::bad_request("schema.invalid", e.to_string()))?;
 
     Ok(())
+}
+
+fn format_difficulty(level: DifficultyLevel) -> String {
+    match level {
+        DifficultyLevel::Easy => "easy".to_string(),
+        DifficultyLevel::Medium => "medium".to_string(),
+        DifficultyLevel::Hard => "hard".to_string(),
+        DifficultyLevel::Expert => "expert".to_string(),
+    }
+}
+
+fn parse_difficulty(s: &str) -> Option<DifficultyLevel> {
+    match s.to_lowercase().as_str() {
+        "easy" => Some(DifficultyLevel::Easy),
+        "medium" => Some(DifficultyLevel::Medium),
+        "hard" => Some(DifficultyLevel::Hard),
+        "expert" => Some(DifficultyLevel::Expert),
+        _ => None,
+    }
+}
+
+fn format_proficiency(level: ProficiencyLevel) -> String {
+    match level {
+        ProficiencyLevel::Novice => "novice".to_string(),
+        ProficiencyLevel::Intermediate => "intermediate".to_string(),
+        ProficiencyLevel::Advanced => "advanced".to_string(),
+        ProficiencyLevel::Expert => "expert".to_string(),
+    }
+}
+
+fn parse_proficiency(s: &str) -> ProficiencyLevel {
+    match s.to_lowercase().as_str() {
+        "novice" => ProficiencyLevel::Novice,
+        "intermediate" => ProficiencyLevel::Intermediate,
+        "advanced" => ProficiencyLevel::Advanced,
+        "expert" => ProficiencyLevel::Expert,
+        _ => ProficiencyLevel::Intermediate,
+    }
 }
