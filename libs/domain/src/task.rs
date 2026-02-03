@@ -59,6 +59,7 @@ pub struct WorkflowHistoryEntry {
 pub struct TaskAssignment {
     pub assignment_id: AssignmentId,
     pub task_id: TaskId,
+    pub project_id: ProjectId,
     pub step_id: String,
     pub user_id: UserId,
     pub status: AssignmentStatus,
@@ -67,4 +68,25 @@ pub struct TaskAssignment {
     pub submitted_at: Option<DateTime<Utc>>,
     pub time_spent_ms: Option<i64>,
     pub metadata: serde_json::Value,
+}
+
+/// Reason for rejecting a task assignment
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum RejectReason {
+    /// User has a conflict of interest with this task
+    ConflictOfInterest,
+    /// Task instructions are unclear
+    UnclearInstructions,
+    /// Task is missing necessary context
+    MissingContext,
+    /// Task is outside user's area of expertise
+    OutsideExpertise,
+    /// User has a schedule conflict
+    ScheduleConflict,
+    /// Technical issues prevent working on the task
+    TechnicalIssues,
+    /// Other reason with custom details
+    Other { details: String },
 }

@@ -61,6 +61,7 @@ pub enum AssignmentStatus {
     Submitted,
     Expired,
     Reassigned,
+    Rejected,
 }
 
 /// Type of workflow step

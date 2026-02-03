@@ -166,10 +166,9 @@ pub async fn create_skill_type(
         })
         .await
         .map_err(|e| match e {
-            glyph_db::CreateSkillTypeError::AlreadyExists(id) => ApiError::conflict(
-                "skill.type.exists",
-                format!("Skill type already exists: {}", id),
-            ),
+            glyph_db::CreateSkillTypeError::AlreadyExists(id) => {
+                ApiError::conflict(format!("Skill type already exists: {}", id))
+            }
             glyph_db::CreateSkillTypeError::Database(e) => {
                 ApiError::Internal(anyhow::anyhow!("{}", e))
             }
@@ -302,7 +301,7 @@ pub async fn certify_user_skill(
     let permission_service = PermissionService::new(pool.clone());
     if !permission_service.can_certify_skills(&current_user) {
         return Err(ApiError::Forbidden {
-            permission: "role:admin or role:skill:certifier".to_string(),
+            message: "Requires admin or skill certifier role".to_string(),
         });
     }
 
@@ -360,7 +359,7 @@ pub async fn revoke_user_skill(
     let permission_service = PermissionService::new(pool.clone());
     if !permission_service.can_certify_skills(&current_user) {
         return Err(ApiError::Forbidden {
-            permission: "role:admin or role:skill:certifier".to_string(),
+            message: "Requires admin or skill certifier role".to_string(),
         });
     }
 

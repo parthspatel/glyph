@@ -6,6 +6,7 @@ mod data_sources;
 mod health;
 mod project_types;
 mod projects;
+pub mod queue;
 mod skills;
 mod tasks;
 mod teams;
@@ -31,12 +32,14 @@ fn api_v1_routes() -> Router {
         .nest("/skills/types", skills::skill_type_routes())
         .nest("/teams", teams::routes())
         .nest("/tasks", tasks::routes())
+        .nest("/queue", queue::routes_without_ws())
         .nest("/annotations", annotations::routes())
         .nest("/projects", projects::routes())
         .nest(
             "/projects/{project_id}/data-sources",
             data_sources::routes(),
         )
+        .nest("/projects/{project_id}/tasks", tasks::project_routes())
         .nest("/project-types", project_types::routes())
         .nest("/workflows", workflows::routes())
 }

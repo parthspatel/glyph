@@ -338,3 +338,37 @@ pub enum DeleteDataSourceError {
     #[error("database error")]
     Database(#[source] sqlx::Error),
 }
+
+// =============================================================================
+// Assignment Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum FindAssignmentError {
+    #[error("assignment not found: {0}")]
+    NotFound(glyph_domain::AssignmentId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum CreateAssignmentError {
+    #[error("duplicate assignment: user already assigned to this task/step")]
+    DuplicateAssignment,
+    #[error("task not found: {0}")]
+    TaskNotFound(glyph_domain::TaskId),
+    #[error("user not found: {0}")]
+    UserNotFound(glyph_domain::UserId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateAssignmentError {
+    #[error("assignment not found: {0}")]
+    NotFound(glyph_domain::AssignmentId),
+    #[error("invalid status transition from {from} to {to}")]
+    InvalidStatusTransition { from: String, to: String },
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}

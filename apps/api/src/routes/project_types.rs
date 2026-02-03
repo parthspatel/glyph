@@ -432,7 +432,7 @@ async fn delete_project_type(
             ApiError::not_found("project_type", &project_type_id)
         }
         glyph_db::DeleteProjectTypeError::InUse => {
-            ApiError::conflict("project_type.in_use", "Project type is in use by projects")
+            ApiError::conflict("Project type is in use by projects")
         }
         glyph_db::DeleteProjectTypeError::Database(e) => {
             tracing::error!("Failed to delete project type: {:?}", e);

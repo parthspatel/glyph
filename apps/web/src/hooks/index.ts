@@ -3,5 +3,7 @@ export * from "./useUsers";
 export * from "./useTeams";
 export * from "./useProjects";
 export * from "./useProjectTypes";
+export * from "./useQueue";
+export * from "./useWebSocket";
 export * from "./useUnsavedChanges";
 export * from "./useBreadcrumbs";

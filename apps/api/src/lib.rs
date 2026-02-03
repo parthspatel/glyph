@@ -12,6 +12,8 @@ pub mod middleware;
 pub mod openapi;
 pub mod routes;
 pub mod services;
+pub mod ws;
 
 pub use error::ApiError;
 pub use openapi::ApiDoc;
+pub use ws::QueueUpdateHub;

@@ -16,12 +16,16 @@ import { AdminUsersPage } from "./pages/admin/UsersPage";
 import { ProjectTypesPage } from "./pages/admin/ProjectTypesPage";
 import { TeamsPage } from "./pages/TeamsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
+import { QueuePage } from "./pages/QueuePage";
+import { TaskDetailPage } from "./pages/TaskDetailPage";
 
 export function App() {
   return (
     <Routes>
       <Route element={<AppLayout />}>
         <Route path="/" element={<HomePage />} />
+        <Route path="/queue" element={<QueuePage />} />
+        <Route path="/tasks/:taskId" element={<TaskDetailPage />} />
         <Route path="/projects" element={<ProjectsPage />} />
         <Route path="/projects/new" element={<ProjectCreatePage />} />
         <Route path="/projects/:projectId" element={<ProjectDetailPage />} />

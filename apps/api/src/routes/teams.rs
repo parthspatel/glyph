@@ -440,7 +440,7 @@ pub async fn update_team(
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
         if !is_leader {
             return Err(ApiError::Forbidden {
-                permission: format!("team:lead({}) or role:admin", id),
+                message: format!("Requires team lead or admin role for team {}", id),
             });
         }
     }
@@ -594,7 +594,7 @@ pub async fn add_team_member(
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
         if !is_leader {
             return Err(ApiError::Forbidden {
-                permission: format!("team:lead({}) or role:admin", id),
+                message: format!("Requires team lead or admin role for team {}", id),
             });
         }
     }
@@ -625,10 +625,9 @@ pub async fn add_team_member(
         .add_member(&id, &member_user_id, role, body.allocation_percentage)
         .await
         .map_err(|e| match e {
-            TeamMembershipError::AlreadyMember => ApiError::conflict(
-                "team.member.exists",
-                "User is already a member of this team",
-            ),
+            TeamMembershipError::AlreadyMember => {
+                ApiError::conflict("User is already a member of this team")
+            }
             TeamMembershipError::NotAMember => {
                 ApiError::Internal(anyhow::anyhow!("Unexpected: not member after add"))
             }
@@ -683,7 +682,7 @@ pub async fn remove_team_member(
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
         if !is_leader {
             return Err(ApiError::Forbidden {
-                permission: format!("team:lead({}) or role:admin", id),
+                message: format!("Requires team lead or admin role for team {}", id),
             });
         }
     }
@@ -766,7 +765,7 @@ pub async fn update_team_member(
             .map_err(|e| ApiError::Internal(anyhow::anyhow!("{}", e)))?;
         if !is_leader {
             return Err(ApiError::Forbidden {
-                permission: format!("team:lead({}) or role:admin", id),
+                message: format!("Requires team lead or admin role for team {}", id),
             });
         }
     }

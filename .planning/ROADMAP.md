@@ -321,29 +321,33 @@ Plans:
 
 ---
 
-## Phase 7: Task Management
+## Phase 7: Task Management ✅
 
 **Goal**: Task lifecycle, assignment engine, and annotator queue.
 
-**Requirements Covered**: REQ-TASK-001 through REQ-TASK-004, REQ-WF-005
+**Requirements Covered**: REQ-TASK-001, REQ-TASK-002, REQ-TASK-004, REQ-WF-005
+
+**Completed**: 2026-02-03
+
+> **Note:** REQ-TASK-003 (Annotation Model) is deferred to Phase 9 (Annotation Interface) where it naturally belongs with annotation UI and submission logic.
 
 ### Deliverables
-- [ ] Task CRUD API
-- [ ] Task status lifecycle management
-- [ ] Assignment engine (skill-based, load-balanced)
-- [ ] Duplicate assignment prevention
-- [ ] Cross-step exclusion
-- [ ] Assignment accept/reject flow
-- [ ] Task queue API with filtering/sorting
-- [ ] WebSocket for real-time queue updates
-- [ ] FE: Task queue view
-- [ ] FE: Task detail view
+- [x] Task CRUD API
+- [x] Task status lifecycle management
+- [x] Assignment engine (skill-based, load-balanced)
+- [x] Duplicate assignment prevention
+- [x] Cross-step exclusion
+- [x] Assignment accept/reject flow
+- [x] Task queue API with filtering/sorting
+- [x] WebSocket for real-time queue updates
+- [x] FE: Task queue view
+- [x] FE: Task detail view
 
 ### Success Criteria
-- Tasks flow through workflow correctly
-- Assignments respect skill requirements
-- No duplicate assignments possible
-- Queue updates in real-time
+- [x] Tasks flow through workflow correctly
+- [x] Assignments respect skill requirements
+- [x] No duplicate assignments possible
+- [x] Queue updates in real-time
 
 ---
 

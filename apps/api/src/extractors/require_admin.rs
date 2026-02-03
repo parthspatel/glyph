@@ -25,7 +25,7 @@ where
 
         if !user.has_role("admin") {
             return Err(ApiError::Forbidden {
-                permission: "role:admin".to_string(),
+                message: "Requires admin role".to_string(),
             });
         }
 

@@ -25,11 +25,11 @@ pub enum ApiError {
     #[error("unauthorized")]
     Unauthorized,
 
-    #[error("forbidden: requires {permission}")]
-    Forbidden { permission: String },
+    #[error("forbidden: {message}")]
+    Forbidden { message: String },
 
     #[error("conflict: {message}")]
-    Conflict { code: &'static str, message: String },
+    Conflict { message: String },
 
     #[error("internal server error")]
     Internal(#[source] anyhow::Error),
@@ -51,7 +51,7 @@ impl ApiError {
             Self::BadRequest { code, .. } => code,
             Self::Unauthorized => "auth.unauthorized",
             Self::Forbidden { .. } => "auth.forbidden",
-            Self::Conflict { code, .. } => code,
+            Self::Conflict { .. } => "conflict",
             Self::Internal(_) => "internal",
         }
     }
@@ -84,10 +84,16 @@ impl ApiError {
         }
     }
 
-    /// Create a conflict error with code and message
-    pub fn conflict(code: &'static str, message: impl Into<String>) -> Self {
+    /// Create a conflict error with message
+    pub fn conflict(message: impl Into<String>) -> Self {
         Self::Conflict {
-            code,
+            message: message.into(),
+        }
+    }
+
+    /// Create a forbidden error with message
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self::Forbidden {
             message: message.into(),
         }
     }

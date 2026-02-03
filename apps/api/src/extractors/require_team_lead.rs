@@ -73,7 +73,7 @@ where
 
         if !has_permission {
             return Err(ApiError::Forbidden {
-                permission: format!("team:lead({})", team_id),
+                message: format!("Requires team lead role for team {}", team_id),
             });
         }
 

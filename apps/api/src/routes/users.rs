@@ -238,10 +238,9 @@ pub async fn create_user(
 
     let repo = PgUserRepository::new(pool);
     let user = repo.create(&new_user).await.map_err(|e| match e {
-        glyph_db::CreateUserError::EmailExists(email) => ApiError::conflict(
-            "user.email.exists",
-            format!("Email already exists: {}", email),
-        ),
+        glyph_db::CreateUserError::EmailExists(email) => {
+            ApiError::conflict(format!("Email already exists: {}", email))
+        }
         glyph_db::CreateUserError::Database(e) => ApiError::Internal(anyhow::anyhow!("{}", e)),
     })?;
 
@@ -274,7 +273,7 @@ pub async fn update_user(
     // Users can only update their own profile unless admin
     if current_user.user_id != id && !current_user.has_role("admin") {
         return Err(ApiError::Forbidden {
-            permission: "user:update(self) or role:admin".to_string(),
+            message: "Can only update own profile or requires admin role".to_string(),
         });
     }
 
@@ -291,10 +290,9 @@ pub async fn update_user(
     let repo = PgUserRepository::new(pool);
     let user = repo.update(&id, &update).await.map_err(|e| match e {
         glyph_db::UpdateUserError::NotFound(id) => ApiError::not_found("user", id.to_string()),
-        glyph_db::UpdateUserError::EmailExists(email) => ApiError::conflict(
-            "user.email.exists",
-            format!("Email already exists: {}", email),
-        ),
+        glyph_db::UpdateUserError::EmailExists(email) => {
+            ApiError::conflict(format!("Email already exists: {}", email))
+        }
         glyph_db::UpdateUserError::Database(e) => ApiError::Internal(anyhow::anyhow!("{}", e)),
     })?;
 

@@ -274,6 +274,13 @@ pub trait TaskRepository: Send + Sync {
 
     /// Soft delete a task
     async fn soft_delete(&self, id: &TaskId) -> Result<(), UpdateTaskError>;
+
+    /// Set cooldown period for a task (prevents reassignment until cooldown expires)
+    async fn set_cooldown(
+        &self,
+        id: &TaskId,
+        until: chrono::DateTime<chrono::Utc>,
+    ) -> Result<(), UpdateTaskError>;
 }
 
 /// Repository for annotation operations
@@ -416,4 +423,74 @@ pub trait SkillRepository: Send + Sync {
         user_id: &UserId,
         skill_id: &str,
     ) -> Result<Option<UserSkillWithStatus>, sqlx::Error>;
+}
+
+// =============================================================================
+// Assignment Repository
+// =============================================================================
+
+/// Input for creating a new assignment
+#[derive(Debug, Clone)]
+pub struct NewAssignment {
+    pub task_id: TaskId,
+    pub project_id: ProjectId,
+    pub step_id: String,
+    pub user_id: UserId,
+}
+
+/// Input for rejecting an assignment
+#[derive(Debug, Clone)]
+pub struct RejectAssignment {
+    pub assignment_id: AssignmentId,
+    pub reason: serde_json::Value,
+}
+
+/// Repository for assignment operations
+#[async_trait]
+pub trait AssignmentRepository: Send + Sync {
+    /// Find an assignment by ID
+    async fn find_by_id(
+        &self,
+        id: &AssignmentId,
+    ) -> Result<Option<glyph_domain::TaskAssignment>, FindAssignmentError>;
+
+    /// Create a new assignment (with duplicate prevention)
+    async fn create(
+        &self,
+        assignment: &NewAssignment,
+    ) -> Result<glyph_domain::TaskAssignment, CreateAssignmentError>;
+
+    /// Update assignment status
+    async fn update_status(
+        &self,
+        id: &AssignmentId,
+        status: glyph_domain::AssignmentStatus,
+    ) -> Result<glyph_domain::TaskAssignment, UpdateAssignmentError>;
+
+    /// List assignments by user with optional status filter
+    async fn list_by_user(
+        &self,
+        user_id: &UserId,
+        status: Option<glyph_domain::AssignmentStatus>,
+    ) -> Result<Vec<glyph_domain::TaskAssignment>, sqlx::Error>;
+
+    /// List all assignments for a task
+    async fn list_by_task(
+        &self,
+        task_id: &TaskId,
+    ) -> Result<Vec<glyph_domain::TaskAssignment>, sqlx::Error>;
+
+    /// Reject an assignment with reason
+    async fn reject(&self, reject: &RejectAssignment) -> Result<(), UpdateAssignmentError>;
+
+    /// Check if user has worked on a task in specified steps (for cross-step exclusion)
+    async fn has_user_worked_on_task(
+        &self,
+        user_id: &UserId,
+        task_id: &TaskId,
+        exclude_steps: &[String],
+    ) -> Result<bool, sqlx::Error>;
+
+    /// Count active assignments for a user (for load balancing)
+    async fn count_active_by_user(&self, user_id: &UserId) -> Result<i64, sqlx::Error>;
 }
