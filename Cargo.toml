@@ -103,6 +103,12 @@ object_store = { version = "0.11", features = ["aws", "gcp", "azure"] }
 # Testing
 mockall = "0.13"
 
+# Workflow engine
+petgraph = "0.6"
+serde_yml = "0.0.12"
+backoff = { version = "0.4", features = ["tokio"] }
+strsim = "0.11"
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
