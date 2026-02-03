@@ -22,13 +22,15 @@ Nunjucks template rendering with a component library for building annotation int
 ## Implementation Decisions
 
 ### Component API Design
-- **Props-only data flow** — Components receive all data through explicit props, no context injection
-- **Callback props with convention** — Components emit changes via `on{FieldName}Change` callbacks; layout system auto-generates standard handlers that write to `output.{fieldName}`
+- **Stable interface contract for WASM compatibility** — Component and layout interfaces must be defined in a language-agnostic way (WIT or similar) to allow WASM components alongside React components. Props, callbacks, and slot interfaces use serializable types (JSON-compatible) at the boundary.
+- **Props-only data flow** — Components receive all data through explicit props, no context injection. This supports WASM components which cannot access React context.
+- **Callback props with convention** — Components emit changes via `on{FieldName}Change` callbacks; layout system auto-generates standard handlers that write to `output.{fieldName}`. Callbacks pass serializable data for WASM interop.
 - **Highly configurable with easy defaults** — Extensive options available for power users, but simple cases require minimal config
 - **Both build-time and runtime validation** — Schema validates layout YAML/JSON before deployment, components also validate props at runtime as safety net
 - **Configurable error handling per-component** — Author chooses `required={true}` for strict failure or allows graceful fallback with placeholder/empty state
-- **Named slots for extension points** — Components define slots (header, footer, toolbar) where authors can inject custom content
+- **Named slots for extension points** — Components define slots (header, footer, toolbar) where authors can inject custom content. Slot content passed as serializable description for WASM components.
 - **State as output (opt-in) + optional ref for actions** — Internal state exposed declaratively via output props when needed; refs available for imperative methods (scroll, focus, clear). Default: components manage state internally, no output emitted unless explicitly wired.
+- **Component interface definition** — Each Tier 1 component must have a corresponding interface definition (schema) that describes props, callbacks, slots, and events in a language-agnostic format. This enables WASM implementations and tooling (autocomplete, validation).
 
 ### Layout Composition Model
 - **Three template formats per PRD** — Nunjucks (primary, Jinja-like), MDX (content-heavy with Markdown), TSX (complex layouts requiring full React)
@@ -75,6 +77,7 @@ Nunjucks template rendering with a component library for building annotation int
 <specifics>
 ## Specific Ideas
 
+- **WASM-first interface design** — Design component interfaces as if WASM is the primary consumer, then React implementation becomes a thin wrapper. This ensures the interface is truly language-agnostic and serializable. Think of it like defining a gRPC/protobuf contract first.
 - Monaco editor should feel native — same experience as VS Code for template authoring
 - Selection in NERTagger should feel snappy and precise, especially for medical text where character-level accuracy matters
 - Real-time sync like Google Docs — annotators shouldn't lose work if they accidentally open two tabs
