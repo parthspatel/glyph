@@ -298,3 +298,43 @@ pub enum RemoveSkillRequirementError {
     #[error("database error")]
     Database(#[source] sqlx::Error),
 }
+
+// =============================================================================
+// Data Source Repository Errors
+// =============================================================================
+
+#[derive(Debug, Error)]
+pub enum CreateDataSourceError {
+    #[error("data source name already exists: {0}")]
+    NameExists(String),
+    #[error("project not found: {0}")]
+    ProjectNotFound(glyph_domain::ProjectId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum FindDataSourceError {
+    #[error("data source not found: {0}")]
+    NotFound(glyph_domain::DataSourceId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum UpdateDataSourceError {
+    #[error("data source not found: {0}")]
+    NotFound(glyph_domain::DataSourceId),
+    #[error("data source name already exists: {0}")]
+    NameExists(String),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
+
+#[derive(Debug, Error)]
+pub enum DeleteDataSourceError {
+    #[error("data source not found: {0}")]
+    NotFound(glyph_domain::DataSourceId),
+    #[error("database error")]
+    Database(#[source] sqlx::Error),
+}
