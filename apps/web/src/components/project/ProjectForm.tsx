@@ -8,6 +8,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as Accordion from "@radix-ui/react-accordion";
 import { z } from "zod";
 import { useState, useEffect, useCallback } from "react";
+import { Check, AlertCircle, Circle, ChevronDown } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { useUnsavedChanges } from "../../hooks/useUnsavedChanges";
 import { ProjectChecklist } from "./ProjectChecklist";
 import {
@@ -60,22 +63,36 @@ function AccordionSection({
   children,
 }: AccordionSectionProps) {
   return (
-    <Accordion.Item value={value} className="accordion-item">
-      <Accordion.Header className="accordion-header">
-        <Accordion.Trigger className="accordion-trigger">
-          <div className="accordion-trigger-content">
+    <Accordion.Item
+      value={value}
+      className="bg-card rounded-lg border overflow-hidden"
+    >
+      <Accordion.Header>
+        <Accordion.Trigger className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-muted/50 transition-colors group data-[state=open]:border-b data-[state=open]:border-border">
+          <div className="flex items-center gap-3">
             <span
-              className={`accordion-status ${isComplete ? "complete" : hasError ? "error" : ""}`}
+              className={cn(
+                "size-6 rounded-full flex items-center justify-center text-sm font-medium",
+                isComplete && "bg-success/10 text-success",
+                hasError && "bg-destructive/10 text-destructive",
+                !isComplete && !hasError && "bg-muted text-muted-foreground",
+              )}
             >
-              {isComplete ? "✓" : hasError ? "!" : "○"}
+              {isComplete ? (
+                <Check className="size-4" />
+              ) : hasError ? (
+                <AlertCircle className="size-4" />
+              ) : (
+                <Circle className="size-4" />
+              )}
             </span>
-            <span className="accordion-title">{title}</span>
+            <span className="font-medium text-foreground">{title}</span>
           </div>
-          <span className="accordion-chevron">▼</span>
+          <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </Accordion.Trigger>
       </Accordion.Header>
-      <Accordion.Content className="accordion-content">
-        <div className="accordion-content-inner">{children}</div>
+      <Accordion.Content className="px-4 py-4 data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+        {children}
       </Accordion.Content>
     </Accordion.Item>
   );
@@ -164,14 +181,14 @@ export function ProjectForm({
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={handleSubmit(onSubmit)} className="project-form">
+      <form onSubmit={handleSubmit(onSubmit)} className="flex gap-6">
         {/* Main form area */}
-        <div className="project-form-main">
+        <div className="flex-1 space-y-4">
           <Accordion.Root
             type="multiple"
             value={openSections}
             onValueChange={setOpenSections}
-            className="project-accordion"
+            className="space-y-2"
           >
             <AccordionSection
               value="basic"
@@ -216,25 +233,21 @@ export function ProjectForm({
           </Accordion.Root>
 
           {/* Form actions */}
-          <div className="project-form-actions">
-            <button
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => window.history.back()}
-              className="btn btn-ghost"
             >
               Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={!isDirty || isSubmitting}
-              className="btn btn-primary"
-            >
+            </Button>
+            <Button type="submit" disabled={!isDirty || isSubmitting}>
               {isSubmitting
                 ? "Saving..."
                 : isEdit
                   ? "Save Changes"
                   : "Create Project"}
-            </button>
+            </Button>
           </div>
         </div>
 

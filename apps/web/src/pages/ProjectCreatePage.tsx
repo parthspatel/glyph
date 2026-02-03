@@ -3,9 +3,13 @@
  * Uses ProjectForm with empty default values.
  */
 
-import { useNavigate } from 'react-router-dom';
-import { useCreateProject } from '../hooks/useProjects';
-import { ProjectForm, type ProjectFormData } from '../components/project/ProjectForm';
+import { useNavigate } from "react-router-dom";
+import { FolderPlus } from "lucide-react";
+import { useCreateProject } from "../hooks/useProjects";
+import {
+  ProjectForm,
+  type ProjectFormData,
+} from "../components/project/ProjectForm";
 
 export function ProjectCreatePage() {
   const navigate = useNavigate();
@@ -20,18 +24,21 @@ export function ProjectCreatePage() {
       });
       navigate(`/projects/${project.project_id}`);
     } catch (error) {
-      console.error('Failed to create project:', error);
+      console.error("Failed to create project:", error);
       // Error handling would show toast/notification
     }
   };
 
   return (
-    <div className="page-container">
-      <header className="page-header">
-        <h1>Create Project</h1>
-        <p className="page-subtitle">
-          Set up a new annotation project
-        </p>
+    <div className="max-w-5xl mx-auto p-6 space-y-6">
+      <header className="flex items-center gap-3">
+        <FolderPlus className="size-8 text-primary" />
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Create Project</h1>
+          <p className="text-muted-foreground">
+            Set up a new annotation project
+          </p>
+        </div>
       </header>
 
       <ProjectForm onSubmit={handleSubmit} />
