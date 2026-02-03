@@ -4,11 +4,15 @@
 
 pub mod assignment;
 pub mod config;
+pub mod consensus;
 pub mod engine;
 pub mod parser;
 pub mod state;
+pub mod transition;
 
 pub use config::*;
+pub use consensus::*;
 pub use engine::*;
 pub use parser::*;
 pub use state::*;
+pub use transition::*;
