@@ -208,28 +208,30 @@
 
 ---
 
-## Phase 5: Project Management
+## Phase 5: Project Management ✅
 
 **Goal**: Project and project type configuration.
 
 **Requirements Covered**: REQ-PROJ-001 through REQ-PROJ-003
 
+**Completed**: 2026-02-02
+
 ### Deliverables
-- [ ] Project CRUD API
-- [ ] Project type CRUD API
-- [ ] Schema validation (task input, annotation output)
-- [ ] Skill requirement configuration
-- [ ] Data source configuration
-- [ ] Project status lifecycle
-- [ ] FE: Project list view
-- [ ] FE: Project creation wizard
-- [ ] FE: Project settings page
+- [x] Project CRUD API
+- [x] Project type CRUD API
+- [x] Schema validation (task input, annotation output)
+- [x] Skill requirement configuration
+- [x] Data source configuration
+- [x] Project status lifecycle
+- [x] FE: Project list view
+- [x] FE: Project creation wizard
+- [x] FE: Project settings page
 
 ### Success Criteria
-- Projects can be created with types and schemas
-- Schema validation works for test payloads
-- Project lifecycle transitions work
-- UI supports full project management
+- [x] Projects can be created with types and schemas
+- [x] Schema validation works for test payloads
+- [x] Project lifecycle transitions work
+- [x] UI supports full project management
 
 ---
 
@@ -263,28 +265,30 @@ Plans:
 
 ---
 
-## Phase 5.2: Style Phase 5 Screens (INSERTED)
+## Phase 5.2: Style Phase 5 Screens ✅
 
 **Goal**: Apply the design system from Phase 3.1 to all Phase 5 screens (projects, project types, data sources) for consistent theming.
 
 **Depends on**: Phase 3.1, Phase 5.1
 
+**Completed**: 2026-02-02
+
 ### Deliverables
-- [ ] Apply design tokens to ProjectsPage (list view)
-- [ ] Apply design tokens to Project creation wizard
-- [ ] Apply design tokens to Project settings page
-- [ ] Apply design tokens to Project detail page
-- [ ] Style ProjectCard component with theme colors
-- [ ] Style ProjectTable component with theme colors
-- [ ] Style ProjectTypeSelector with theme colors
-- [ ] Style DataSourceConfig with theme colors
-- [ ] Ensure dark/light mode works on all Phase 5 screens
+- [x] Apply design tokens to ProjectsPage (list view)
+- [x] Apply design tokens to Project creation wizard
+- [x] Apply design tokens to Project settings page
+- [x] Apply design tokens to Project detail page
+- [x] Style ProjectCard component with theme colors
+- [x] Style ProjectTable component with theme colors
+- [x] Style ProjectTypeSelector with theme colors
+- [x] Style DataSourceConfig with theme colors
+- [x] Ensure dark/light mode works on all Phase 5 screens
 
 ### Success Criteria
-- All Phase 5 screens use design tokens consistently
-- Royal purple is visible as primary accent color
-- Dark and light modes render correctly on all screens
-- No hardcoded colors remain in Phase 5 components
+- [x] All Phase 5 screens use design tokens consistently
+- [x] Royal purple is visible as primary accent color
+- [x] Dark and light modes render correctly on all screens
+- [x] No hardcoded colors remain in Phase 5 components
 
 ---
 

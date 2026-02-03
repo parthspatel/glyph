@@ -4,6 +4,22 @@
 /gsd:execute-phase 5
 /gsd:verify-work 5
 
+/gsd:plan-phase 5 --gaps
+/gsd:execute-phase 5 --gaps
+
+
 
 /gsd:map-codebase
 /gsd:progress
+
+--- DONE ---
+
+/gsd:insert-phase 3.1 build a style guideline for Glyph.
+
+/gsd:insert-phase 4.1 for phase 4 screens ensure that there is a ux flow from the root / to all screens
+
+/gsd:insert-phase 4.2 for phase 4 screens style the UI to match the theme
+
+/gsd:insert-phase 5.1 for phase 5 screens ensure that there is a ux flow from the root / to all screens
+
+/gsd:insert-phase 5.2 for phase 5 screens style the UI to match the theme

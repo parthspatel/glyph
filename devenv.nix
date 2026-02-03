@@ -19,6 +19,9 @@
     pkgs.jq
     pkgs.sqlx-cli
     pkgs.pnpm
+    pkgs.playwright
+    pkgs.playwright-test
+    pkgs.playwright-driver
   ];
 
   # JavaScript/TypeScript with pnpm
