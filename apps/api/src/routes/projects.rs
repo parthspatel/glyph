@@ -236,6 +236,27 @@ pub struct CloneProjectRequest {
     pub new_name: Option<String>,
 }
 
+// =============================================================================
+// Activation Validation Types
+// =============================================================================
+
+/// Individual activation check
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ActivationCheck {
+    pub id: String,
+    pub category: String,
+    pub severity: String,
+    pub message: String,
+    pub fix_action: Option<String>,
+}
+
+/// Activation validation response
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ActivationValidationResponse {
+    pub can_activate: bool,
+    pub checks: Vec<ActivationCheck>,
+}
+
 pub fn routes() -> Router {
     Router::new()
         .route("/", get(list_projects).post(create_project))
@@ -245,6 +266,10 @@ pub fn routes() -> Router {
         )
         .route("/{project_id}/status", post(update_status))
         .route("/{project_id}/activate", post(activate_project))
+        .route(
+            "/{project_id}/validate-activation",
+            get(validate_project_activation),
+        )
         .route("/{project_id}/clone", post(clone_project))
 }
 
@@ -640,6 +665,140 @@ async fn activate_project(
     })?;
 
     Ok(Json(ProjectDetailResponse::from(updated)))
+}
+
+/// Validate project activation readiness
+#[utoipa::path(
+    get,
+    path = "/api/v1/projects/{project_id}/validate-activation",
+    params(
+        ("project_id" = String, Path, description = "Project ID"),
+    ),
+    responses(
+        (status = 200, description = "Validation checks", body = ActivationValidationResponse),
+        (status = 404, description = "Project not found"),
+    ),
+    tag = "projects"
+)]
+async fn validate_project_activation(
+    Path(project_id): Path<String>,
+    _current_user: CurrentUser,
+    Extension(pool): Extension<PgPool>,
+) -> Result<Json<ActivationValidationResponse>, ApiError> {
+    let id: ProjectId = project_id
+        .parse()
+        .map_err(|_| ApiError::not_found("project", &project_id))?;
+
+    let repo = PgProjectRepository::new(pool);
+
+    let project = repo
+        .find_by_id(&id)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to find project {}: {:?}", project_id, e);
+            ApiError::Internal(anyhow::anyhow!("{}", e))
+        })?
+        .ok_or_else(|| ApiError::not_found("project", &project_id))?;
+
+    let checks = build_activation_checks(&project);
+    let has_blockers = checks.iter().any(|c| c.severity == "blocker");
+
+    Ok(Json(ActivationValidationResponse {
+        can_activate: !has_blockers,
+        checks,
+    }))
+}
+
+/// Build detailed activation checks for a project
+fn build_activation_checks(project: &Project) -> Vec<ActivationCheck> {
+    let mut checks = Vec::new();
+
+    // Status check
+    if project.status != ProjectStatus::Draft {
+        checks.push(ActivationCheck {
+            id: "status_draft".to_string(),
+            category: "workflow".to_string(),
+            severity: "blocker".to_string(),
+            message: "Project must be in draft status to activate".to_string(),
+            fix_action: None,
+        });
+    } else {
+        checks.push(ActivationCheck {
+            id: "status_draft".to_string(),
+            category: "workflow".to_string(),
+            severity: "passed".to_string(),
+            message: "Project is in draft status".to_string(),
+            fix_action: None,
+        });
+    }
+
+    // Workflow check
+    if project.workflow_id.is_some() {
+        checks.push(ActivationCheck {
+            id: "has_workflow".to_string(),
+            category: "workflow".to_string(),
+            severity: "passed".to_string(),
+            message: "Workflow is configured".to_string(),
+            fix_action: None,
+        });
+    } else {
+        checks.push(ActivationCheck {
+            id: "has_workflow".to_string(),
+            category: "workflow".to_string(),
+            severity: "warning".to_string(),
+            message: "No workflow configured (using default)".to_string(),
+            fix_action: Some("workflow".to_string()),
+        });
+    }
+
+    // Layout check
+    if project.layout_id.is_some() {
+        checks.push(ActivationCheck {
+            id: "has_layout".to_string(),
+            category: "layouts".to_string(),
+            severity: "passed".to_string(),
+            message: "Layout is configured".to_string(),
+            fix_action: None,
+        });
+    } else {
+        checks.push(ActivationCheck {
+            id: "has_layout".to_string(),
+            category: "layouts".to_string(),
+            severity: "blocker".to_string(),
+            message: "No annotation layout configured".to_string(),
+            fix_action: Some("layouts".to_string()),
+        });
+    }
+
+    // Team check
+    if project.team_id.is_some() {
+        checks.push(ActivationCheck {
+            id: "has_team".to_string(),
+            category: "permissions".to_string(),
+            severity: "passed".to_string(),
+            message: "Team is assigned".to_string(),
+            fix_action: None,
+        });
+    } else {
+        checks.push(ActivationCheck {
+            id: "has_team".to_string(),
+            category: "permissions".to_string(),
+            severity: "warning".to_string(),
+            message: "No team assigned".to_string(),
+            fix_action: Some("settings".to_string()),
+        });
+    }
+
+    // Data source placeholder (would need to check data sources table)
+    checks.push(ActivationCheck {
+        id: "has_data_source".to_string(),
+        category: "data_source".to_string(),
+        severity: "warning".to_string(),
+        message: "Data source configuration pending".to_string(),
+        fix_action: Some("data-source".to_string()),
+    });
+
+    checks
 }
 
 /// Clone a project
