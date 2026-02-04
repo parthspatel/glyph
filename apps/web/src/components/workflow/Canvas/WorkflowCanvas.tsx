@@ -2,22 +2,26 @@
  * WorkflowCanvas - React Flow wrapper for visual workflow editing.
  * Provides the main canvas with grid, minimap, controls, and keyboard shortcuts.
  */
-import { useCallback, memo } from "react";
+import { useCallback, memo, type DragEvent } from "react";
 import {
   ReactFlow,
+  ReactFlowProvider,
   Controls,
   MiniMap,
   Background,
   BackgroundVariant,
+  useReactFlow,
   type OnConnect,
   type Connection,
+  type IsValidConnection,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useHotkeys } from "react-hotkeys-hook";
 import { useCanvasStore } from "../stores/canvasStore";
+import { useCanvasActions } from "../hooks/useCanvasActions";
 import { nodeTypes } from "./nodes";
 import { edgeTypes } from "./edges/TransitionEdge";
-import type { WorkflowNode, WorkflowEdge } from "../types";
+import type { WorkflowNode, WorkflowEdge, NodeType } from "../types";
 
 // =============================================================================
 // Constants
@@ -53,23 +57,22 @@ const MINIMAP_NODE_COLOR = (node: WorkflowNode): string => {
 };
 
 // =============================================================================
-// Component
+// Inner Component (needs ReactFlowProvider context)
 // =============================================================================
 
-export interface WorkflowCanvasProps {
-  /** Optional class name for the container */
+interface WorkflowCanvasInnerProps {
   className?: string;
-  /** Callback when a new connection is made */
   onConnect?: (connection: Connection) => void;
-  /** Callback when a node is selected */
   onNodeSelect?: (nodeId: string | null) => void;
 }
 
-export const WorkflowCanvas = memo(function WorkflowCanvas({
+const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
   className,
   onConnect: onConnectProp,
   onNodeSelect,
-}: WorkflowCanvasProps) {
+}: WorkflowCanvasInnerProps) {
+  const reactFlow = useReactFlow();
+
   // Store state
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
@@ -81,11 +84,49 @@ export const WorkflowCanvas = memo(function WorkflowCanvas({
   const undo = useCanvasStore((state) => state.undo);
   const redo = useCanvasStore((state) => state.redo);
 
+  // Canvas actions
+  const {
+    createNode,
+    deleteSelected,
+    copySelected,
+    pasteNodes,
+    duplicateSelected,
+    selectAll,
+    isValidConnection,
+  } = useCanvasActions();
+
+  // Handle drag over (allow drop)
+  const handleDragOver = useCallback((e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  }, []);
+
+  // Handle drop from palette
+  const handleDrop = useCallback(
+    (e: DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+
+      const type = e.dataTransfer.getData(
+        "application/reactflow-type",
+      ) as NodeType;
+      if (!type) return;
+
+      // Get drop position in flow coordinates
+      const position = reactFlow.screenToFlowPosition({
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      createNode(type, position);
+    },
+    [reactFlow, createNode],
+  );
+
   // Handle new connections
   const handleConnect: OnConnect = useCallback(
     (connection) => {
       const newEdge: WorkflowEdge = {
-        id: `${connection.source}-${connection.target}`,
+        id: `${connection.source}-${connection.target}-${Date.now()}`,
         source: connection.source!,
         target: connection.target!,
         sourceHandle: connection.sourceHandle,
@@ -97,6 +138,17 @@ export const WorkflowCanvas = memo(function WorkflowCanvas({
       onConnectProp?.(connection);
     },
     [storeAddEdge, onConnectProp],
+  );
+
+  // Connection validation
+  const handleIsValidConnection: IsValidConnection = useCallback(
+    (connection) => {
+      return isValidConnection({
+        source: connection.source!,
+        target: connection.target!,
+      });
+    },
+    [isValidConnection],
   );
 
   // Handle node selection
@@ -129,8 +181,58 @@ export const WorkflowCanvas = memo(function WorkflowCanvas({
     { enableOnFormTags: false },
   );
 
+  useHotkeys(
+    "mod+c",
+    (e) => {
+      e.preventDefault();
+      copySelected();
+    },
+    { enableOnFormTags: false },
+  );
+
+  useHotkeys(
+    "mod+v",
+    (e) => {
+      e.preventDefault();
+      pasteNodes();
+    },
+    { enableOnFormTags: false },
+  );
+
+  useHotkeys(
+    "mod+d",
+    (e) => {
+      e.preventDefault();
+      duplicateSelected();
+    },
+    { enableOnFormTags: false },
+  );
+
+  useHotkeys(
+    "mod+a",
+    (e) => {
+      e.preventDefault();
+      selectAll();
+    },
+    { enableOnFormTags: false },
+  );
+
+  useHotkeys(
+    "delete, backspace",
+    (e) => {
+      e.preventDefault();
+      deleteSelected();
+    },
+    { enableOnFormTags: false },
+  );
+
   return (
-    <div className={className} style={{ width: "100%", height: "100%" }}>
+    <div
+      className={className}
+      style={{ width: "100%", height: "100%" }}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <ReactFlow<WorkflowNode, WorkflowEdge>
         nodes={nodes}
         edges={edges}
@@ -139,6 +241,7 @@ export const WorkflowCanvas = memo(function WorkflowCanvas({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        isValidConnection={handleIsValidConnection}
         onSelectionChange={handleSelectionChange}
         onViewportChange={setViewport}
         fitView
@@ -150,7 +253,7 @@ export const WorkflowCanvas = memo(function WorkflowCanvas({
         panOnDrag
         selectionOnDrag
         multiSelectionKeyCode="Shift"
-        deleteKeyCode={["Backspace", "Delete"]}
+        deleteKeyCode={[]}
         minZoom={0.1}
         maxZoom={2}
         defaultEdgeOptions={{
@@ -169,5 +272,28 @@ export const WorkflowCanvas = memo(function WorkflowCanvas({
         <Background variant={BackgroundVariant.Dots} gap={15} size={1} />
       </ReactFlow>
     </div>
+  );
+});
+
+// =============================================================================
+// Public Component (wraps with ReactFlowProvider)
+// =============================================================================
+
+export interface WorkflowCanvasProps {
+  /** Optional class name for the container */
+  className?: string;
+  /** Callback when a new connection is made */
+  onConnect?: (connection: Connection) => void;
+  /** Callback when a node is selected */
+  onNodeSelect?: (nodeId: string | null) => void;
+}
+
+export const WorkflowCanvas = memo(function WorkflowCanvas(
+  props: WorkflowCanvasProps,
+) {
+  return (
+    <ReactFlowProvider>
+      <WorkflowCanvasInner {...props} />
+    </ReactFlowProvider>
   );
 });
