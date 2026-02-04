@@ -12,3 +12,4 @@ export * from "./useDraft";
 export * from "./useSkipReasons";
 export * from "./useAnnotationSubmit";
 export * from "./useReview";
+export * from "./useAdjudication";

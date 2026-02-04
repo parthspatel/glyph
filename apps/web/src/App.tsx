@@ -20,6 +20,7 @@ import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { QueuePage } from "./pages/QueuePage";
 import { TaskDetailPage } from "./pages/TaskDetailPage";
 import { ReviewPage } from "./pages/ReviewPage";
+import { AdjudicatePage } from "./pages/AdjudicatePage";
 
 export function App() {
   return (
@@ -38,6 +39,7 @@ export function App() {
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/annotate/:taskId" element={<AnnotatePage />} />
         <Route path="/review/:taskId" element={<ReviewPage />} />
+        <Route path="/adjudicate/:taskId" element={<AdjudicatePage />} />
         <Route path="/users/:userId" element={<UserProfilePage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailPage />} />

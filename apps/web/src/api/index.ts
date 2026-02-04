@@ -58,3 +58,9 @@ export type {
   SubmitReviewRequest,
   AddCommentRequest,
 } from "./reviews";
+export { adjudicationApi } from "./adjudication";
+export type {
+  TaskForAdjudication,
+  AnnotationForComparison,
+  SubmitResolutionRequest,
+} from "./adjudication";
