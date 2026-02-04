@@ -5,9 +5,9 @@
 ## Current Position
 
 - **Milestone**: v1.0
-- **Current Phase**: 8 (Layout System)
+- **Current Phase**: 9 (Annotation Interface)
 - **Phase Status**: Verified
-- **Overall Progress**: 86% (12/14 phases)
+- **Overall Progress**: 93% (13/14 phases)
 
 ## Phase Summary
 
@@ -26,7 +26,7 @@
 | 6 | Workflow Engine | ✅ Verified | [VERIFICATION.md](phases/06-workflow-engine/06-VERIFICATION.md) |
 | 7 | Task Management | ✅ Verified | — |
 | 8 | Layout System | ✅ Verified | [VERIFICATION.md](phases/08-layout-system/08-VERIFICATION.md) |
-| 9 | Annotation Interface | ⚪ Blocked | — |
+| 9 | Annotation Interface | ✅ Verified | [VERIFICATION.md](phases/09-annotation-interface/09-VERIFICATION.md) |
 | 10 | Quality Management | ⚪ Blocked | — |
 | 11 | Dashboards | ⚪ Blocked | — |
 | 12 | Hooks & Plugins | ⚪ Blocked | — |
@@ -35,6 +35,17 @@
 
 ## Recent Activity
 
+- **2026-02-04**: Phase 9 (Annotation Interface) verified
+  - AnnotatePage with collapsible toolbar and layout rendering
+  - Draft auto-save with 1.5s debounce and status indicator
+  - SkipTaskModal with reason selection
+  - Submit flow with validation and manual Next Task advance
+  - InstructionsPanel (collapsible) and ShortcutsModal (? key)
+  - ReviewPage with side-by-side comparison view
+  - ReviewActions: Approve/Reject/Request Changes
+  - AdjudicatePage with multi-annotation tabs
+  - ResolutionPanel for final authoritative annotation
+  - All 9/9 plans verified
 - **2026-02-03**: Phase 8 (Layout System) verified
   - WASM-compatible component interface schemas
   - Shortcut registry with conflict detection and undo/redo manager
@@ -53,14 +64,6 @@
   - All 14/14 plans verified
 - **2026-02-02**: Phase 7 (Task Management) completed
 - **2026-02-02**: Phase 6 (Workflow Engine) verified
-  - Workflow state machine with step execution engine
-  - Step executors (annotation, review, adjudication, auto-process, sub-workflow)
-  - Transition evaluation with conditional logic
-  - Consensus calculation (Cohen's Kappa, Krippendorff's Alpha, IoU)
-  - Goal tracking with debounced updates
-  - Event sourcing with PostgreSQL persistence and snapshots
-  - WorkflowOrchestrator integration layer
-  - All 11/11 must-haves passing verification
 - **2026-02-02**: Phase 5 (Project Management) verified
 - **2026-02-02**: Phase 5.2 (Style Phase 5 Screens) verified
 - **2026-02-02**: Phase 5.1 (UX Navigation Flow for Phase 5) verified
@@ -85,6 +88,9 @@
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-04 | Manual advance after submit | Show "Submitted!" then "Next Task" button - annotator controls pace |
+| 2026-02-04 | Side-by-side review layout | Original on left, corrections on right for easy comparison |
+| 2026-02-04 | Copy-on-select for adjudication | Selecting annotation tab copies its data to resolution panel |
 | 2026-02-03 | Monaco editor for template editing | VS Code-like experience with syntax highlighting, autocomplete |
 | 2026-02-03 | Nunjucks as primary template format | Jinja-like syntax familiar to Python/Rust devs |
 | 2026-02-03 | WASM-first interface design | Component interfaces designed as if WASM is primary consumer |
@@ -120,13 +126,31 @@ None.
 
 ## Session Continuity
 
-Last worked: 2026-02-03
-Context: Phase 8 (Layout System) verified, ready for Phase 9 (Annotation Interface)
+Last worked: 2026-02-04
+Context: Phase 9 (Annotation Interface) verified, ready for Phase 10 (Quality Management)
 
 ## Next Actions
 
-1. Run `/gsd:plan-phase 9` to plan Phase 9 (Annotation Interface)
-2. Or run `/gsd:execute-phase 9` if plans already exist
+1. Run `/gsd:plan-phase 10` to plan Phase 10 (Quality Management)
+2. Or run `/gsd:execute-phase 10` if plans already exist
+
+## Phase 9 Deliverables
+
+| Deliverable | Status |
+|-------------|--------|
+| AnnotatePage with toolbar and LayoutRenderer | ✅ |
+| Draft auto-save with debounce (useDraft) | ✅ |
+| Save status indicator (SaveStatus) | ✅ |
+| Skip task modal with reason selection | ✅ |
+| Submit flow with validation (useAnnotationSubmit) | ✅ |
+| Instructions panel (collapsible) | ✅ |
+| Shortcuts modal (? key) | ✅ |
+| Keyboard shortcuts (Ctrl+S, Ctrl+Enter, Escape) | ✅ |
+| ReviewPage with side-by-side view | ✅ |
+| Review actions (Approve/Reject/Request Changes) | ✅ |
+| AdjudicatePage with annotation tabs | ✅ |
+| Resolution panel for final annotation | ✅ |
+| Routes: /annotate, /review, /adjudicate | ✅ |
 
 ## Phase 8 Deliverables
 
