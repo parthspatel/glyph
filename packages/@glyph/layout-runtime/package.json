@@ -17,6 +17,10 @@
     "./undo": {
       "types": "./src/undo/index.ts",
       "import": "./src/undo/index.ts"
+    },
+    "./validation": {
+      "types": "./src/validation/index.ts",
+      "import": "./src/validation/index.ts"
     }
   },
   "scripts": {
@@ -26,6 +30,8 @@
   },
   "dependencies": {
     "@glyph/components": "workspace:*",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "nunjucks": "^3.2.4",
     "react": "^18.3.0",
     "react-hotkeys-hook": "^5.2.4",

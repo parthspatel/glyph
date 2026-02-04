@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://glyph.io/schemas/layout.json",
+  "title": "Glyph Layout Schema",
+  "description": "Schema for validating Glyph layout configuration",
+  "type": "object",
+  "required": ["version", "template"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "Semantic version of the layout (e.g., '1.0.0')"
+    },
+    "template": {
+      "type": "string",
+      "enum": ["nunjucks", "mdx", "tsx"],
+      "description": "Template format used for rendering"
+    },
+    "content": {
+      "type": "string",
+      "description": "Template content string"
+    },
+    "inputSchema": {
+      "$ref": "#/$defs/jsonSchema",
+      "description": "JSON Schema for validating task input data"
+    },
+    "outputSchema": {
+      "$ref": "#/$defs/jsonSchema",
+      "description": "JSON Schema for validating annotation output data"
+    },
+    "settings": {
+      "$ref": "#/$defs/layoutSettings",
+      "description": "Layout behavior settings"
+    },
+    "shortcuts": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Custom keyboard shortcut bindings (action -> key)"
+    },
+    "components": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "description": "Allowlist of component names (security)"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "author": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "description": "Optional layout metadata"
+    }
+  },
+  "$defs": {
+    "layoutSettings": {
+      "type": "object",
+      "properties": {
+        "autoSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable auto-save of drafts"
+        },
+        "autoSaveInterval": {
+          "type": "integer",
+          "minimum": 1000,
+          "default": 5000,
+          "description": "Auto-save interval in milliseconds"
+        },
+        "showProgress": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show progress indicator"
+        },
+        "keyboardShortcuts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable keyboard shortcuts"
+        },
+        "confirmSubmit": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show confirmation dialog on submit"
+        },
+        "allowSkip": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow skipping tasks"
+        },
+        "customCss": {
+          "type": "string",
+          "description": "Custom CSS styles"
+        },
+        "maxNestingDepth": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20,
+          "default": 10,
+          "description": "Maximum template nesting depth (DoS prevention)"
+        },
+        "maxIterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 1000,
+          "description": "Maximum loop iterations (DoS prevention)"
+        }
+      },
+      "additionalProperties": false
+    },
+    "jsonSchema": {
+      "type": "object",
+      "description": "A JSON Schema document",
+      "properties": {
+        "$schema": { "type": "string" },
+        "$id": { "type": "string" },
+        "type": { "type": "string" },
+        "properties": { "type": "object" },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

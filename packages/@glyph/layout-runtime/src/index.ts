@@ -6,7 +6,9 @@
 
 export { LayoutRenderer } from "./LayoutRenderer";
 export { useLayoutContext } from "./context";
-export { validateLayout } from "./validation";
+
+// Validation (Ajv schema + template security)
+export * from "./validation";
 
 // Shortcuts
 export * from "./shortcuts";
