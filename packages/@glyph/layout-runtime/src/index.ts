@@ -16,4 +16,7 @@ export * from "./shortcuts";
 // Undo/Redo
 export * from "./undo";
 
+// Real-time Sync (Y.js)
+export * from "./sync";
+
 export type { LayoutContext, LayoutConfig } from "./types";
