@@ -7,12 +7,19 @@
 
 import React, { useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { useHotkeys } from "react-hotkeys-hook";
+import { AlertCircle, Loader2, ArrowRight } from "lucide-react";
 import { LayoutRenderer } from "@glyph/layout-runtime";
-import { AnnotationToolbar, SkipTaskModal } from "../components/annotation";
+import {
+  AnnotationToolbar,
+  SkipTaskModal,
+  InstructionsPanel,
+  ShortcutsModal,
+} from "../components/annotation";
 import { useTaskForAnnotation } from "../hooks/useTask";
 import { useDraft } from "../hooks/useDraft";
 import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
+import { useAnnotationSubmit } from "../hooks/useAnnotationSubmit";
 
 export function AnnotatePage(): React.ReactElement {
   const { taskId } = useParams<{ taskId: string }>();
@@ -28,17 +35,15 @@ export function AnnotatePage(): React.ReactElement {
   const [output, setOutput] = useState<Record<string, unknown>>({});
 
   // UI state for panels/modals
-  const [showInstructions, setShowInstructions] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showSkipModal, setShowSkipModal] = useState(false);
-
-  // Submission state
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Auto-save draft hook
   const {
     saveStatus,
     save,
+    clear: clearDraft,
     isLoading: draftLoading,
   } = useDraft({
     taskId,
@@ -48,30 +53,73 @@ export function AnnotatePage(): React.ReactElement {
     },
   });
 
+  // Annotation submit hook
+  const { submit, isSubmitting, showNextButton, goToNext, validationErrors } =
+    useAnnotationSubmit({
+      taskId,
+      projectId: task?.project_id,
+      onClearDraft: clearDraft,
+    });
+
   // Warn about unsaved changes
   useUnsavedChanges({
     isDirty:
       saveStatus === "pending" ||
       (typeof saveStatus === "object" && "saving" in saveStatus),
+    enabled: !showNextButton, // Don't warn after successful submit
   });
+
+  // Keyboard shortcuts
+  useHotkeys("?", () => setShowShortcuts(true), { enableOnFormTags: false }, [
+    setShowShortcuts,
+  ]);
+
+  useHotkeys(
+    "mod+enter",
+    () => {
+      if (!showNextButton && !isSubmitting) {
+        submit(output);
+      }
+    },
+    { enableOnFormTags: true, preventDefault: true },
+    [output, showNextButton, isSubmitting, submit],
+  );
+
+  useHotkeys(
+    "mod+s",
+    () => {
+      if (!showNextButton) {
+        save(output);
+      }
+    },
+    { enableOnFormTags: true, preventDefault: true },
+    [output, showNextButton, save],
+  );
+
+  useHotkeys(
+    "escape",
+    () => {
+      setShowShortcuts(false);
+      setShowSkipModal(false);
+    },
+    { enableOnFormTags: true },
+    [],
+  );
 
   // Handle output changes from LayoutRenderer
   const handleOutputChange = useCallback(
     (newOutput: Record<string, unknown>) => {
+      if (showNextButton) return; // Don't allow changes after submit
       setOutput(newOutput);
-      // Trigger auto-save
       save(newOutput);
     },
-    [save],
+    [save, showNextButton],
   );
 
-  // Handle submit (placeholder - will be implemented in Plan 09-05)
+  // Handle submit
   const handleSubmit = useCallback(() => {
-    setIsSubmitting(true);
-    // TODO: Implement submission flow in Plan 09-05
-    console.log("Submit annotation:", output);
-    setTimeout(() => setIsSubmitting(false), 1000);
-  }, [output]);
+    submit(output);
+  }, [output, submit]);
 
   // Handle skip - open modal
   const handleSkip = useCallback(() => {
@@ -143,20 +191,53 @@ export function AnnotatePage(): React.ReactElement {
   return (
     <div className="flex h-screen flex-col">
       {/* Toolbar */}
-      <AnnotationToolbar
-        taskInfo={{
-          projectName: task.project_name,
-          taskId: task.task_id,
-          stepType: task.step_type,
-        }}
-        saveStatus={saveStatus}
-        onInstructionsClick={() => setShowInstructions(true)}
-        onShortcutsClick={() => setShowShortcuts(true)}
-        onSubmit={handleSubmit}
-        onSkip={handleSkip}
-        isSubmitting={isSubmitting}
-        canSubmit={Object.keys(output).length > 0}
+      {showNextButton ? (
+        // Post-submit toolbar with Next Task button
+        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
+          <div className="flex items-center gap-2 text-success">
+            <span className="text-sm font-medium">✓ Annotation submitted</span>
+          </div>
+          <button
+            onClick={goToNext}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <span>Next Task</span>
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      ) : (
+        <AnnotationToolbar
+          taskInfo={{
+            projectName: task.project_name,
+            taskId: task.task_id,
+            stepType: task.step_type,
+          }}
+          saveStatus={saveStatus}
+          onInstructionsClick={() => setShowInstructions(!showInstructions)}
+          onShortcutsClick={() => setShowShortcuts(true)}
+          onSubmit={handleSubmit}
+          onSkip={handleSkip}
+          isSubmitting={isSubmitting}
+          canSubmit={Object.keys(output).length > 0}
+        />
+      )}
+
+      {/* Instructions Panel */}
+      <InstructionsPanel
+        instructions={task.instructions}
+        isExpanded={showInstructions}
+        onToggle={() => setShowInstructions(!showInstructions)}
       />
+
+      {/* Validation errors */}
+      {validationErrors.length > 0 && (
+        <div className="border-b border-destructive/20 bg-destructive/10 px-4 py-2">
+          <div className="flex items-center gap-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4" />
+            <span>{validationErrors[0].message}</span>
+          </div>
+        </div>
+      )}
 
       {/* Main content area */}
       <div className="flex-1 overflow-auto p-4">
@@ -175,43 +256,8 @@ export function AnnotatePage(): React.ReactElement {
         projectId={task.project_id}
       />
 
-      {/* Instructions Panel - placeholder for Plan 09-06 */}
-      {showInstructions && (
-        <div className="fixed inset-y-0 right-0 z-50 w-96 border-l border-border bg-card p-4 shadow-lg">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Instructions</h2>
-            <button
-              onClick={() => setShowInstructions(false)}
-              className="rounded p-1 hover:bg-muted"
-            >
-              ×
-            </button>
-          </div>
-          <div className="mt-4 text-muted-foreground">
-            {task.instructions || "No instructions available for this task."}
-          </div>
-        </div>
-      )}
-
-      {/* Shortcuts Modal - placeholder for Plan 09-06 */}
-      {showShortcuts && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="w-full max-w-md rounded-lg bg-card p-6 shadow-xl">
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Keyboard Shortcuts</h2>
-              <button
-                onClick={() => setShowShortcuts(false)}
-                className="rounded p-1 hover:bg-muted"
-              >
-                ×
-              </button>
-            </div>
-            <div className="mt-4 text-sm text-muted-foreground">
-              Keyboard shortcuts will be configured in Plan 09-06.
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Shortcuts Modal */}
+      <ShortcutsModal open={showShortcuts} onOpenChange={setShowShortcuts} />
     </div>
   );
 }
