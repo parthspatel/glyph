@@ -25,4 +25,13 @@ export * from "./registry";
 // Nunjucks Template Environment
 export * from "./nunjucks";
 
+// Sandbox (iframe rendering)
+export * from "./sandbox";
+
+// Data Binding
+export * from "./binding";
+
+// Monaco Editor Extensions
+export * from "./monaco";
+
 export type { LayoutContext, LayoutConfig } from "./types";

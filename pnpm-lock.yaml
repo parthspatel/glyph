@@ -188,6 +188,9 @@ importers:
       '@types/react':
         specifier: ^18.3.0
         version: 18.3.27
+      monaco-editor:
+        specifier: ^0.55.1
+        version: 0.55.1
       typescript:
         specifier: ^5.7.0
         version: 5.9.3
