@@ -379,3 +379,114 @@ export type AssignmentId = string;
 
 /** Quality Score ID in format: score_{uuid} */
 export type QualityScoreId = string;
+
+/** Draft ID in format: draft_{uuid} */
+export type DraftId = string;
+
+/** Skip Reason ID in format: skip_{uuid} */
+export type SkipReasonId = string;
+
+/** Review ID in format: review_{uuid} */
+export type ReviewId = string;
+
+/** Review Comment ID in format: rcmt_{uuid} */
+export type ReviewCommentId = string;
+
+// =============================================================================
+// Annotation Workflow Types (Phase 9)
+// =============================================================================
+
+/**
+ * Draft - Auto-saved annotation work in progress.
+ * Only one draft per (task_id, user_id) pair.
+ */
+export interface Draft {
+  draft_id: DraftId;
+  task_id: TaskId;
+  user_id: UserId;
+  /** Annotation data in progress */
+  data: Record<string, unknown>;
+  /** Optimistic locking version */
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Scope of a skip reason */
+export type SkipReasonScope = "system" | "project";
+
+/**
+ * SkipReason - Reason why an annotator skipped a task.
+ * System defaults are available to all projects.
+ * Projects can add project-specific skip reasons.
+ */
+export interface SkipReason {
+  skip_reason_id: SkipReasonId;
+  /** Machine-readable code (e.g., "unclear_instructions") */
+  code: string;
+  /** Human-readable label (e.g., "Unclear Instructions") */
+  label: string;
+  /** Whether this is a system-wide or project-specific reason */
+  scope: SkipReasonScope;
+  /** Project ID if scope is "project" */
+  project_id?: ProjectId;
+  /** Whether this skip reason is active */
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** System default skip reason codes */
+export const SYSTEM_SKIP_REASONS = [
+  { code: "unclear_instructions", label: "Unclear Instructions" },
+  { code: "bad_data_quality", label: "Bad Data Quality" },
+  { code: "conflict_of_interest", label: "Conflict of Interest" },
+  { code: "technical_issue", label: "Technical Issue" },
+] as const;
+
+/**
+ * TaskSkip - Record of a task being skipped by an annotator.
+ */
+export interface TaskSkip {
+  task_skip_id: string;
+  task_id: TaskId;
+  user_id: UserId;
+  skip_reason_id: SkipReasonId;
+  /** Optional note explaining why task was skipped */
+  note?: string;
+  created_at: string;
+}
+
+/** Review action taken by a reviewer */
+export type ReviewAction = "approve" | "reject" | "request_changes";
+
+/**
+ * Review - Reviewer's evaluation of an annotation.
+ */
+export interface Review {
+  review_id: ReviewId;
+  annotation_id: AnnotationId;
+  task_id: TaskId;
+  reviewer_id: UserId;
+  /** Action taken on the annotation */
+  action: ReviewAction;
+  /** Corrected data if reviewer made edits */
+  corrected_data?: Record<string, unknown>;
+  /** Summary note for the annotation author */
+  summary_note?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * ReviewComment - Inline comment attached to a specific part of an annotation.
+ */
+export interface ReviewComment {
+  comment_id: ReviewCommentId;
+  review_id: ReviewId;
+  /** JSON path or field identifier for the commented content */
+  path: string;
+  /** Comment content */
+  content: string;
+  created_at: string;
+}

@@ -131,6 +131,11 @@ define_prefixed_id!(AssignmentId, "asgn");
 define_prefixed_id!(QualityScoreId, "score");
 define_prefixed_id!(LayoutId, "layout");
 define_prefixed_id!(LayoutVersionId, "lver");
+define_prefixed_id!(DraftId, "draft");
+define_prefixed_id!(SkipReasonId, "skip");
+define_prefixed_id!(ReviewId, "review");
+define_prefixed_id!(ReviewCommentId, "rcmt");
+define_prefixed_id!(TaskSkipId, "tskip");
 
 #[cfg(test)]
 mod tests {
