@@ -72,7 +72,8 @@ pub struct TaskAssignment {
 
 /// Reason for rejecting a task assignment
 #[typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RejectReason {
     /// User has a conflict of interest with this task

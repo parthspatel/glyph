@@ -129,6 +129,8 @@ define_prefixed_id!(AnnotationId, "annot");
 define_prefixed_id!(WorkflowId, "wf");
 define_prefixed_id!(AssignmentId, "asgn");
 define_prefixed_id!(QualityScoreId, "score");
+define_prefixed_id!(LayoutId, "layout");
+define_prefixed_id!(LayoutVersionId, "lver");
 
 #[cfg(test)]
 mod tests {
