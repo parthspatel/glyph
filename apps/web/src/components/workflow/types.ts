@@ -154,8 +154,14 @@ export type WorkflowNodeData = {
   label: string;
   /** Node/step type */
   nodeType: NodeType;
+  /** Step type (alias for nodeType for compatibility) */
+  stepType: NodeType;
   /** Step configuration (undefined for visual-only nodes) */
   stepConfig?: StepConfig;
+  /** Step settings (shorthand for stepConfig.settings) */
+  settings?: StepSettings;
+  /** Description text */
+  description?: string;
   /** Whether node has validation errors */
   hasError?: boolean;
   /** Error messages */

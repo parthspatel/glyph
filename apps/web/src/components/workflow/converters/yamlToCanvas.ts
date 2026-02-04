@@ -67,7 +67,8 @@ function autoLayout(
 
   // Add nodes to dagre
   for (const node of nodes) {
-    const isSmall = node.data.nodeType === "start" || node.data.nodeType === "end";
+    const isSmall =
+      node.data.nodeType === "start" || node.data.nodeType === "end";
     g.setNode(node.id, {
       width: isSmall ? START_END_SIZE : NODE_WIDTH,
       height: isSmall ? START_END_SIZE : NODE_HEIGHT,
@@ -85,7 +86,8 @@ function autoLayout(
   // Apply positions
   return nodes.map((node) => {
     const nodeWithPos = g.node(node.id);
-    const isSmall = node.data.nodeType === "start" || node.data.nodeType === "end";
+    const isSmall =
+      node.data.nodeType === "start" || node.data.nodeType === "end";
     const width = isSmall ? START_END_SIZE : NODE_WIDTH;
     const height = isSmall ? START_END_SIZE : NODE_HEIGHT;
 
@@ -174,7 +176,9 @@ function stepToNode(
   const data: WorkflowNodeData = {
     label: step.name,
     nodeType,
+    stepType: nodeType,
     stepConfig: step,
+    settings: step.settings,
   };
 
   return {
@@ -193,6 +197,7 @@ function createStartNode(position?: { x: number; y: number }): WorkflowNode {
     data: {
       label: "Start",
       nodeType: "start",
+      stepType: "start",
     },
   };
 }
@@ -205,6 +210,7 @@ function createEndNode(position?: { x: number; y: number }): WorkflowNode {
     data: {
       label: "End",
       nodeType: "end",
+      stepType: "end",
     },
   };
 }
@@ -330,9 +336,10 @@ export function yamlToCanvas(yamlString: string): YamlToCanvasResult {
 /**
  * Parse YAML and return just the config object (for validation).
  */
-export function parseYamlConfig(
-  yamlString: string,
-): { config: WorkflowConfig | null; errors: string[] } {
+export function parseYamlConfig(yamlString: string): {
+  config: WorkflowConfig | null;
+  errors: string[];
+} {
   try {
     const parsed = yaml.load(yamlString) as WorkflowConfigWithMeta;
     const validation = validateConfig(parsed);

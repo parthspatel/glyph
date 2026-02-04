@@ -13,6 +13,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@faker-js/faker": "^10.2.0",
     "@fontsource-variable/inter": "^5.2.8",
     "@glyph/components": "workspace:*",
     "@glyph/layout-runtime": "workspace:*",
@@ -37,6 +38,7 @@
     "@tanstack/react-query": "^5.62.0",
     "@tanstack/react-table": "^8.21.3",
     "@types/dagre": "^0.7.53",
+    "@types/json-schema": "^7.0.15",
     "@xyflow/react": "^12.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -51,19 +51,23 @@ function getDefaultNodeData(type: NodeType): WorkflowNode["data"] {
     "sub_workflow",
   ].includes(type);
 
+  const stepConfig = isStepType
+    ? {
+        id: "",
+        name: labelMap[type] || type,
+        step_type: type as StepType,
+        settings: {},
+      }
+    : undefined;
+
   return {
     label: labelMap[type] || type,
     nodeType: type,
+    stepType: type,
     hasError: false,
     errors: [],
-    stepConfig: isStepType
-      ? {
-          id: "",
-          name: labelMap[type] || type,
-          step_type: type as StepType,
-          settings: {},
-        }
-      : undefined,
+    stepConfig,
+    settings: stepConfig?.settings,
   };
 }
 
