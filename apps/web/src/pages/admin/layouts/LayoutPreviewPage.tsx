@@ -228,7 +228,9 @@ export function LayoutPreviewPage() {
               inputSchema={layoutVersion?.inputSchema}
               outputSchema={layoutVersion?.outputSchema}
               allowedComponents={layoutVersion?.allowedComponents}
-              readOnly={layoutVersion?.status !== "draft"}
+              readOnly={
+                layoutVersion ? layoutVersion.status !== "draft" : false
+              }
             />
           </Panel>
 

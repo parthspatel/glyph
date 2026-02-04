@@ -1,5 +1,4 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://glyph.io/schemas/layout.json",
   "title": "Glyph Layout Schema",
   "description": "Schema for validating Glyph layout configuration",
