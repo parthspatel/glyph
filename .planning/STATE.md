@@ -5,9 +5,9 @@
 ## Current Position
 
 - **Milestone**: v1.0
-- **Current Phase**: 7 (Task Management)
-- **Phase Status**: Blocked
-- **Overall Progress**: 79% (11/14 phases)
+- **Current Phase**: 8 (Layout System)
+- **Phase Status**: Verified
+- **Overall Progress**: 86% (12/14 phases)
 
 ## Phase Summary
 
@@ -24,8 +24,8 @@
 | 5.1 | UX Navigation Flow for Phase 5 | ✅ Verified | [VERIFICATION.md](phases/05.1-ux-navigation-flow/5.1-VERIFICATION.md) |
 | 5.2 | Style Phase 5 Screens | ✅ Verified | [VERIFICATION.md](phases/05.2-style-phase-5-screens/05.2-VERIFICATION.md) |
 | 6 | Workflow Engine | ✅ Verified | [VERIFICATION.md](phases/06-workflow-engine/06-VERIFICATION.md) |
-| 7 | Task Management | 🟡 Ready | — |
-| 8 | Layout System | ⚪ Blocked | — |
+| 7 | Task Management | ✅ Verified | — |
+| 8 | Layout System | ✅ Verified | [VERIFICATION.md](phases/08-layout-system/08-VERIFICATION.md) |
 | 9 | Annotation Interface | ⚪ Blocked | — |
 | 10 | Quality Management | ⚪ Blocked | — |
 | 11 | Dashboards | ⚪ Blocked | — |
@@ -35,6 +35,23 @@
 
 ## Recent Activity
 
+- **2026-02-03**: Phase 8 (Layout System) verified
+  - WASM-compatible component interface schemas
+  - Shortcut registry with conflict detection and undo/redo manager
+  - Ajv schema validation with compile-once pattern
+  - Y.js real-time sync with WebSocket and IndexedDB persistence
+  - Component registry with security resolver (allowlist enforcement)
+  - Nunjucks environment with security constraints (iteration limits, expression allowlist)
+  - Layout versioning domain types and PostgreSQL migrations
+  - NERTagger with react-window virtualization
+  - Full component library (annotation, layout, form, display, control)
+  - Sandbox iframe manager with CSP enforcement
+  - Data binding system with BindingProvider context
+  - Monaco language service (syntax highlighting, autocomplete, hover, diagnostics)
+  - Layout preview page with live preview and device presets
+  - Browser verified: Monaco editor, syntax highlighting, live preview working
+  - All 14/14 plans verified
+- **2026-02-02**: Phase 7 (Task Management) completed
 - **2026-02-02**: Phase 6 (Workflow Engine) verified
   - Workflow state machine with step execution engine
   - Step executors (annotation, review, adjudication, auto-process, sub-workflow)
@@ -45,50 +62,11 @@
   - WorkflowOrchestrator integration layer
   - All 11/11 must-haves passing verification
 - **2026-02-02**: Phase 5 (Project Management) verified
-  - Wired ProjectType CRUD API routes to PgProjectTypeRepository
-  - Wired skill requirement routes to repository
-  - Created PgDataSourceRepository with full CRUD + sync stats
-  - Wired DataSource API routes to PgDataSourceRepository
-  - Browser-verified project detail page functionality
-  - All 9/9 must-haves passing verification
 - **2026-02-02**: Phase 5.2 (Style Phase 5 Screens) verified
-  - Applied design tokens to all Phase 5 screens
-  - ProjectsPage with zebra stripes, semantic status badges, text progress
-  - ProjectDetailPage with 75/25 layout, stat cards with border accents
-  - ProjectForm with styled accordion, progress checklist, tag pills
-  - All pages use shadcn Button and Skeleton components
-  - No hardcoded colors - all use Tailwind design tokens
 - **2026-02-02**: Phase 5.1 (UX Navigation Flow for Phase 5) verified
-  - Fixed breadcrumb cache lookup to resolve project names from React Query
-  - Added route labels for project-types, sources, overview
-  - Created ProjectTypesPage admin screen with table and CRUD actions
-  - Added project-scoped sidebar navigation (Overview, Settings, Tasks)
-  - Conditional sidebar rendering based on URL params
-  - All routes accessible from root (/) with proper navigation flow
 - **2026-01-31**: Phase 4.2 (Style Phase 4 Screens) verified
-  - Applied design system to all 11 Phase 4 components
-  - User profile with semantic color badges (role, status, skills)
-  - Admin users table with zebra stripes and purple selection states
-  - Teams pages with stat cards and semantic border colors
-  - TeamTree uses neutral bg-muted for navigation (per user decision)
-  - AddMemberModal uses purple for interactive selection
-  - No hardcoded colors - all use Tailwind design tokens
 - **2026-01-31**: Phase 4.1 (UX Navigation Flow) verified
-  - shadcn/ui sidebar with hover-to-expand behavior
-  - Role-based navigation filtering
-  - Breadcrumb navigation with React Query cache integration
-  - Protected routes for admin pages
-  - Mobile bottom tab navigation
-  - Home page with role-based redirects
-  - All routes wrapped in AppLayout with SidebarProvider
 - **2026-01-31**: Phase 3.1 (Style Guideline) verified
-  - Tailwind v4 with Vite plugin (CSS-based config)
-  - OKLCH design tokens for light/dark modes
-  - Purple primary: oklch(0.627 0.265 303.9)
-  - ThemeProvider with system/dark/light modes
-  - FOWT prevention script in index.html
-  - shadcn/ui configured with Stone base
-  - Human verified theme switching works
 - **2026-01-29**: Phase 4 (User & Team Management) verified
 - **2026-01-28**: Phase 3 (Authentication) verified
 - **2026-01-28**: Phase 2 (Core Domain) verified
@@ -107,6 +85,11 @@
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
+| 2026-02-03 | Monaco editor for template editing | VS Code-like experience with syntax highlighting, autocomplete |
+| 2026-02-03 | Nunjucks as primary template format | Jinja-like syntax familiar to Python/Rust devs |
+| 2026-02-03 | WASM-first interface design | Component interfaces designed as if WASM is primary consumer |
+| 2026-02-03 | Y.js for real-time sync | CRDT-based, conflict-free collaboration like Google Docs |
+| 2026-02-03 | Sandbox iframe with CSP | Secure template rendering with Content Security Policy |
 | 2026-01-31 | Purple for interactive elements only | Professional, subtle aesthetic - navigation uses neutral highlights |
 | 2026-01-31 | Zebra stripes with bg-muted/30 | Comfortable density, subtle alternating rows |
 | 2026-01-31 | Semantic color borders for stat cards | Visual hierarchy without heavy purple usage |
@@ -137,13 +120,42 @@ None.
 
 ## Session Continuity
 
-Last worked: 2026-02-02
-Context: Phase 6 (Workflow Engine) verified, ready for Phase 7 (Task Management)
+Last worked: 2026-02-03
+Context: Phase 8 (Layout System) verified, ready for Phase 9 (Annotation Interface)
 
 ## Next Actions
 
-1. Run `/gsd:plan-phase 7` to plan Phase 7 (Task Management)
-2. Or run `/gsd:execute-phase 7` if plans already exist
+1. Run `/gsd:plan-phase 9` to plan Phase 9 (Annotation Interface)
+2. Or run `/gsd:execute-phase 9` if plans already exist
+
+## Phase 8 Deliverables
+
+| Deliverable | Status |
+|-------------|--------|
+| Component interface schemas (WASM-compatible) | ✅ |
+| Shortcut registry with conflict detection | ✅ |
+| Undo/redo manager with Y.js integration | ✅ |
+| Schema validation (Ajv compile-once pattern) | ✅ |
+| Y.js real-time sync (WebSocket + IndexedDB) | ✅ |
+| Component registry with security resolver | ✅ |
+| Nunjucks environment with security constraints | ✅ |
+| Layout versioning (domain types + migrations) | ✅ |
+| NERTagger with virtualization | ✅ |
+| Annotation components (Classification, BoundingBox, Relation, AudioSegment) | ✅ |
+| Layout components (Section, Grid, Box, Header) | ✅ |
+| Form components (Select, TextArea, Checkbox, RadioGroup) | ✅ |
+| Display components (TextDisplay, ImageViewer, PDFViewer, AudioPlayer) | ✅ |
+| Control components (Show, ForEach, Switch) | ✅ |
+| Sandbox iframe with CSP enforcement | ✅ |
+| Data binding system (BindingProvider, hooks) | ✅ |
+| Monaco language service for Nunjucks | ✅ |
+| Layout preview page with live preview | ✅ |
+
+## Phase 7 Deliverables
+
+| Deliverable | Status |
+|-------------|--------|
+| Task Management functionality | ✅ |
 
 ## Phase 6 Deliverables
 
@@ -160,60 +172,3 @@ Context: Phase 6 (Workflow Engine) verified, ready for Phase 7 (Task Management)
 | Workflow YAML parser and validator | ✅ |
 | Goal tracking engine | ✅ |
 | Workflow event sourcing | ✅ |
-
-## Phase 5 Deliverables
-
-| Deliverable | Status |
-|-------------|--------|
-| Project CRUD API wired to repository | ✅ |
-| ProjectType CRUD API wired to repository | ✅ |
-| Skill requirement routes wired | ✅ |
-| DataSource repository implementation | ✅ |
-| DataSource API routes wired | ✅ |
-| Project list view (FE) | ✅ |
-| Project creation wizard (FE) | ✅ |
-| Project settings page (FE) | ✅ |
-| Project detail page (FE) | ✅ |
-
-## Phase 5.2 Deliverables
-
-| Deliverable | Status |
-|-------------|--------|
-| ProjectsPage with zebra stripes and status badges | ✅ |
-| ProjectTable with semantic colors | ✅ |
-| ProjectFilters with styled controls | ✅ |
-| BulkActions with fixed bottom bar | ✅ |
-| ProjectDetailPage with 75/25 layout | ✅ |
-| ProjectOverview with stat card borders | ✅ |
-| ProjectActivity with timeline design | ✅ |
-| ProjectCreatePage with styled header | ✅ |
-| ProjectEditPage with skeleton loading | ✅ |
-| ProjectForm with styled accordion | ✅ |
-| ProjectChecklist with progress bar | ✅ |
-| BasicInfoSection with tag pills | ✅ |
-
-## Phase 5.1 Deliverables
-
-| Deliverable | Status |
-|-------------|--------|
-| Breadcrumb cache lookup patterns fixed | ✅ |
-| Route labels for project-types, sources, overview | ✅ |
-| ProjectTypesPage admin screen created | ✅ |
-| Project-scoped sidebar navigation | ✅ |
-| All Phase 5 routes accessible from root | ✅ |
-
-## Phase 4.2 Deliverables
-
-| Deliverable | Status |
-|-------------|--------|
-| UserProfilePage styled with design tokens | ✅ |
-| SkillBadges with semantic status colors | ✅ |
-| QualityStats with semantic border accents | ✅ |
-| UsersPage with shadcn components | ✅ |
-| UserTable with zebra stripes and selection | ✅ |
-| BulkActions with selection context styling | ✅ |
-| TeamsPage with card layout | ✅ |
-| TeamDetailPage with stat cards | ✅ |
-| TeamTree with neutral navigation highlight | ✅ |
-| MemberList with action buttons | ✅ |
-| AddMemberModal with purple selection | ✅ |
