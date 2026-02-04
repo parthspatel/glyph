@@ -19,4 +19,10 @@ export * from "./undo";
 // Real-time Sync (Y.js)
 export * from "./sync";
 
+// Component Registry
+export * from "./registry";
+
+// Nunjucks Template Environment
+export * from "./nunjucks";
+
 export type { LayoutContext, LayoutConfig } from "./types";
