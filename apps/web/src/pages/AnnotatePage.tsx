@@ -2,46 +2,67 @@
  * AnnotatePage - Main annotation workspace for annotators.
  *
  * Renders the task layout with toolbar, handles output changes,
- * and manages draft state.
+ * and manages draft state with auto-save.
  */
 
 import React, { useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import { AlertCircle, Loader2 } from "lucide-react";
 import { LayoutRenderer } from "@glyph/layout-runtime";
-import {
-  AnnotationToolbar,
-  type SaveStatusState,
-} from "../components/annotation";
+import { AnnotationToolbar, SkipTaskModal } from "../components/annotation";
 import { useTaskForAnnotation } from "../hooks/useTask";
+import { useDraft } from "../hooks/useDraft";
+import { useUnsavedChanges } from "../hooks/useUnsavedChanges";
 
 export function AnnotatePage(): React.ReactElement {
   const { taskId } = useParams<{ taskId: string }>();
 
   // Fetch task with layout
-  const { data: task, isLoading, error } = useTaskForAnnotation(taskId);
+  const {
+    data: task,
+    isLoading: taskLoading,
+    error,
+  } = useTaskForAnnotation(taskId);
 
   // Annotation output state
   const [output, setOutput] = useState<Record<string, unknown>>({});
 
-  // Save status state
-  const [saveStatus, setSaveStatus] = useState<SaveStatusState>("idle");
-
-  // UI state for panels/modals (will be implemented in later plans)
+  // UI state for panels/modals
   const [showInstructions, setShowInstructions] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showSkipModal, setShowSkipModal] = useState(false);
 
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Auto-save draft hook
+  const {
+    saveStatus,
+    save,
+    isLoading: draftLoading,
+  } = useDraft({
+    taskId,
+    onLoad: (draftData) => {
+      // Initialize output from loaded draft
+      setOutput(draftData);
+    },
+  });
+
+  // Warn about unsaved changes
+  useUnsavedChanges({
+    isDirty:
+      saveStatus === "pending" ||
+      (typeof saveStatus === "object" && "saving" in saveStatus),
+  });
 
   // Handle output changes from LayoutRenderer
   const handleOutputChange = useCallback(
     (newOutput: Record<string, unknown>) => {
       setOutput(newOutput);
-      // Mark as pending save (auto-save will be implemented in Plan 09-03)
-      setSaveStatus("pending");
+      // Trigger auto-save
+      save(newOutput);
     },
-    [],
+    [save],
   );
 
   // Handle submit (placeholder - will be implemented in Plan 09-05)
@@ -52,14 +73,13 @@ export function AnnotatePage(): React.ReactElement {
     setTimeout(() => setIsSubmitting(false), 1000);
   }, [output]);
 
-  // Handle skip (placeholder - will be implemented in Plan 09-04)
+  // Handle skip - open modal
   const handleSkip = useCallback(() => {
-    // TODO: Implement skip flow in Plan 09-04
-    console.log("Skip task");
+    setShowSkipModal(true);
   }, []);
 
-  // Loading state
-  if (isLoading) {
+  // Loading state (task or draft)
+  if (taskLoading || draftLoading) {
     return (
       <div className="flex h-screen flex-col">
         <div className="flex flex-1 items-center justify-center">
@@ -146,6 +166,14 @@ export function AnnotatePage(): React.ReactElement {
           onOutputChange={handleOutputChange}
         />
       </div>
+
+      {/* Skip Task Modal */}
+      <SkipTaskModal
+        open={showSkipModal}
+        onOpenChange={setShowSkipModal}
+        taskId={task.task_id}
+        projectId={task.project_id}
+      />
 
       {/* Instructions Panel - placeholder for Plan 09-06 */}
       {showInstructions && (
