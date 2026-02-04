@@ -52,3 +52,9 @@ export type {
   SubmitAnnotationRequest,
   NextTaskResponse,
 } from "./annotations";
+export { reviewsApi } from "./reviews";
+export type {
+  TaskForReview,
+  SubmitReviewRequest,
+  AddCommentRequest,
+} from "./reviews";

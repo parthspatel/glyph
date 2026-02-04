@@ -19,6 +19,7 @@ import { TeamsPage } from "./pages/TeamsPage";
 import { TeamDetailPage } from "./pages/TeamDetailPage";
 import { QueuePage } from "./pages/QueuePage";
 import { TaskDetailPage } from "./pages/TaskDetailPage";
+import { ReviewPage } from "./pages/ReviewPage";
 
 export function App() {
   return (
@@ -36,6 +37,7 @@ export function App() {
         <Route path="/projects/:projectId/edit" element={<ProjectEditPage />} />
         <Route path="/projects/:projectId/tasks" element={<TasksPage />} />
         <Route path="/annotate/:taskId" element={<AnnotatePage />} />
+        <Route path="/review/:taskId" element={<ReviewPage />} />
         <Route path="/users/:userId" element={<UserProfilePage />} />
         <Route path="/teams" element={<TeamsPage />} />
         <Route path="/teams/:teamId" element={<TeamDetailPage />} />

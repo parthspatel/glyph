@@ -1,16 +1,18 @@
-/gsd:discuss-phase 5
-/gsd:list-phase-assumptions 5
-/gsd:plan-phase 5
-/gsd:execute-phase 5
-/gsd:verify-work 5
+/gsd:discuss-phase 9
+/gsd:list-phase-assumptions 9
+/gsd:plan-phase 8
+/gsd:execute-phase 8
+/gsd:verify-work 8
 
-/gsd:plan-phase 5 --gaps
-/gsd:execute-phase 5 --gaps
+/gsd:plan-phase 6 --gaps
+/gsd:execute-phase 6 --gaps
 
 
 
 /gsd:map-codebase
 /gsd:progress
+
+review the selections made in phase 7, ensure that they respect the desing decisions of previous phases and [@product-requirements.md](file:///Users/parthpatel/Documents/projects/glyph/docs/design/product-requirements.md)
 
 --- DONE ---
 

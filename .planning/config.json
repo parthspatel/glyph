@@ -11,7 +11,7 @@
     }
   },
   "agents": {
-    "profile": "balanced",
+    "profile": "quality",
     "profiles": {
       "quality": {
         "planning": "opus",
