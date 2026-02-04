@@ -46,3 +46,9 @@ export { draftsApi } from "./drafts";
 export type { Draft } from "./drafts";
 export { skipReasonsApi } from "./skipReasons";
 export type { SkipReason, TaskSkipResponse } from "./skipReasons";
+export { annotationsApi } from "./annotations";
+export type {
+  Annotation,
+  SubmitAnnotationRequest,
+  NextTaskResponse,
+} from "./annotations";
