@@ -29,6 +29,10 @@
     "./control": {
       "types": "./src/control/index.ts",
       "import": "./src/control/index.ts"
+    },
+    "./interfaces": {
+      "types": "./src/interfaces/index.ts",
+      "import": "./src/interfaces/index.ts"
     }
   },
   "scripts": {
