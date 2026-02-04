@@ -9,8 +9,34 @@
  * - Control flow (Show, ForEach, Switch)
  */
 
-export * from './annotation';
-export * from './layout';
-export * from './form';
-export * from './display';
-export * from './control';
+// Annotation components (excluding Box type to avoid conflict with layout/Box)
+export {
+  NERTagger,
+  Classification,
+  BoundingBox,
+  Relation,
+  AudioSegment,
+  type Entity,
+  type EntityType,
+  type NERTaggerProps,
+  type ClassificationProps,
+  type ClassificationOption,
+  type BoundingBoxProps,
+  type BoundingBoxData,
+  type RelationProps,
+  type RelationData,
+  type AudioSegmentProps,
+  type Segment,
+} from "./annotation";
+
+// Layout components (Box component takes precedence)
+export * from "./layout";
+
+// Form components
+export * from "./form";
+
+// Display components
+export * from "./display";
+
+// Control flow components
+export * from "./control";

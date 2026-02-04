@@ -1,6 +1,7 @@
-import React from 'react';
+import React from "react";
 
-export interface Box {
+/** Bounding box data (renamed from Box to avoid conflict with layout/Box component) */
+export interface BoundingBoxData {
   id: string;
   label: string;
   x: number;
@@ -9,11 +10,14 @@ export interface Box {
   height: number;
 }
 
+/** @deprecated Use BoundingBoxData instead */
+export type Box = BoundingBoxData;
+
 export interface BoundingBoxProps {
   /** Image source URL */
   src: string;
   /** Current bounding boxes */
-  value: Box[];
+  value: BoundingBoxData[];
   /** Callback when boxes change */
   onChange: (boxes: Box[]) => void;
   /** Available labels for boxes */
@@ -45,7 +49,11 @@ export function BoundingBox({
   return (
     <div className="bounding-box">
       <div className="bounding-box__canvas">
-        <img src={src} alt="Annotation target" className="bounding-box__image" />
+        <img
+          src={src}
+          alt="Annotation target"
+          className="bounding-box__image"
+        />
         {value.map((box) => (
           <div
             key={box.id}
@@ -74,7 +82,7 @@ export function BoundingBox({
         <div className="bounding-box__controls">
           <p>
             {canAddMore
-              ? `Click and drag on the image to create a box. Available labels: ${labels.join(', ')}`
+              ? `Click and drag on the image to create a box. Available labels: ${labels.join(", ")}`
               : `Maximum ${maxBoxes} boxes reached.`}
           </p>
         </div>
@@ -83,7 +91,8 @@ export function BoundingBox({
       <div className="bounding-box__list">
         {value.map((box, index) => (
           <div key={box.id} className="bounding-box__item">
-            Box {index + 1}: {box.label} ({Math.round(box.width)}×{Math.round(box.height)})
+            Box {index + 1}: {box.label} ({Math.round(box.width)}×
+            {Math.round(box.height)})
           </div>
         ))}
       </div>
