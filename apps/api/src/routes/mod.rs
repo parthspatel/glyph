@@ -3,11 +3,14 @@
 mod annotations;
 pub mod auth;
 mod data_sources;
+mod drafts;
 mod health;
 mod project_types;
 mod projects;
 pub mod queue;
+mod reviews;
 mod skills;
+mod skip_reasons;
 mod tasks;
 mod teams;
 mod users;
@@ -32,6 +35,9 @@ fn api_v1_routes() -> Router {
         .nest("/skills/types", skills::skill_type_routes())
         .nest("/teams", teams::routes())
         .nest("/tasks", tasks::routes())
+        .nest("/tasks/{task_id}/drafts", drafts::routes())
+        .nest("/tasks/{task_id}/skip", skip_reasons::task_skip_route())
+        .nest("/tasks/{task_id}/reviews", reviews::routes())
         .nest("/queue", queue::routes_without_ws())
         .nest("/annotations", annotations::routes())
         .nest("/projects", projects::routes())
@@ -40,6 +46,10 @@ fn api_v1_routes() -> Router {
             data_sources::routes(),
         )
         .nest("/projects/{project_id}/tasks", tasks::project_routes())
+        .nest(
+            "/projects/{project_id}/skip-reasons",
+            skip_reasons::project_routes(),
+        )
         .nest("/project-types", project_types::routes())
         .nest("/workflows", workflows::routes())
 }
