@@ -2,6 +2,10 @@
  * Workflow designer component exports.
  */
 
+// Main Designer
+export { WorkflowDesigner } from "./WorkflowDesigner";
+export type { WorkflowDesignerProps } from "./WorkflowDesigner";
+
 // Canvas
 export { WorkflowCanvas } from "./Canvas/WorkflowCanvas";
 export type { WorkflowCanvasProps } from "./Canvas/WorkflowCanvas";
@@ -32,9 +36,24 @@ export type { NodePaletteProps } from "./Sidebar";
 export { StepConfigPanel, PanelHeader, StepConfigContent } from "./ConfigPanel";
 export type { StepConfigPanelProps } from "./ConfigPanel";
 
+// YAML Editor
+export { WorkflowYamlEditor } from "./YamlEditor";
+export type { WorkflowYamlEditorProps } from "./YamlEditor";
+
+// Converters
+export {
+  canvasToYaml,
+  canvasToConfig,
+  yamlToCanvas,
+  parseYamlConfig,
+} from "./converters";
+export type { CanvasToYamlInput, YamlToCanvasResult } from "./converters";
+
 // Hooks
 export { useCanvasActions } from "./hooks/useCanvasActions";
 export { useStepConfig } from "./hooks/useStepConfig";
+export { useYamlSync } from "./hooks/useYamlSync";
+export type { EditorTab, UseYamlSyncReturn } from "./hooks/useYamlSync";
 
 // Stores
 export { useCanvasStore } from "./stores/canvasStore";

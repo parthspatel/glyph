@@ -5,9 +5,9 @@
 ## Current Position
 
 - **Milestone**: v1.0
-- **Current Phase**: 9 (Annotation Interface)
-- **Phase Status**: Verified
-- **Overall Progress**: 93% (13/14 phases)
+- **Current Phase**: 9.1 (Project Configuration Experience)
+- **Phase Status**: Not Planned
+- **Overall Progress**: 87% (13/15 phases)
 
 ## Phase Summary
 
@@ -27,6 +27,7 @@
 | 7 | Task Management | ✅ Verified | — |
 | 8 | Layout System | ✅ Verified | [VERIFICATION.md](phases/08-layout-system/08-VERIFICATION.md) |
 | 9 | Annotation Interface | ✅ Verified | [VERIFICATION.md](phases/09-annotation-interface/09-VERIFICATION.md) |
+| 9.1 | Project Configuration Experience | ⚪ Not Planned | — |
 | 10 | Quality Management | ⚪ Blocked | — |
 | 11 | Dashboards | ⚪ Blocked | — |
 | 12 | Hooks & Plugins | ⚪ Blocked | — |
@@ -83,6 +84,7 @@
 - Phase 4.2 inserted after Phase 4.1: Style Phase 4 Screens ✅ COMPLETE
 - Phase 5.1 inserted after Phase 5: UX Navigation Flow for Phase 5 ✅ COMPLETE
 - Phase 5.2 inserted after Phase 5.1: Style Phase 5 Screens ✅ COMPLETE
+- Phase 9.1 inserted after Phase 9: Project Configuration Experience (URGENT) — workflow designer, data sources, layout-to-step binding, workflow testing mode
 
 ## Key Decisions
 
@@ -131,8 +133,8 @@ Context: Phase 9 (Annotation Interface) verified, ready for Phase 10 (Quality Ma
 
 ## Next Actions
 
-1. Run `/gsd:plan-phase 10` to plan Phase 10 (Quality Management)
-2. Or run `/gsd:execute-phase 10` if plans already exist
+1. Run `/gsd:plan-phase 9.1` to plan Phase 9.1 (Project Configuration Experience)
+2. This phase must complete before Phase 10 (Quality Management)
 
 ## Phase 9 Deliverables
 

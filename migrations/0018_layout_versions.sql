@@ -13,7 +13,7 @@ CREATE TABLE layouts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    project_type_id UUID REFERENCES project_types(id) ON DELETE SET NULL,
+    project_type_id UUID REFERENCES project_types(project_type_id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -34,7 +34,7 @@ CREATE TABLE layout_versions (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     published_at TIMESTAMPTZ,
     deprecated_at TIMESTAMPTZ,
-    created_by UUID NOT NULL REFERENCES users(id),
+    created_by UUID NOT NULL REFERENCES users(user_id),
 
     -- Unique version string per layout
     UNIQUE (layout_id, version)

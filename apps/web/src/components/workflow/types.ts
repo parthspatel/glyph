@@ -48,6 +48,8 @@ export interface StepSettings {
   visibility?: Visibility;
   /** Required roles for assignment */
   required_roles?: string[];
+  /** Required skills for assignment */
+  required_skills?: string[];
   /** Condition expression for conditional steps */
   condition?: string;
   /** Sub-workflow ID for sub_workflow steps */

@@ -21,8 +21,9 @@ CREATE TABLE workflow_events_2026_03 PARTITION OF workflow_events
     FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
 
 -- Optimistic concurrency: only one event per stream+version
+-- Must include partition key (occurred_at) for partitioned table
 CREATE UNIQUE INDEX idx_workflow_events_stream_version
-    ON workflow_events (stream_id, version);
+    ON workflow_events (stream_id, version, occurred_at);
 
 -- Query events by type and time
 CREATE INDEX idx_workflow_events_type_time

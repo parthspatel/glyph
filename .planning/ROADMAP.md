@@ -18,7 +18,8 @@
 | 7 | Task Management | Tasks, assignments, queue | Phase 6 | BE, FE |
 | 8 | Layout System | Nunjucks runtime, components, rendering | Phase 5 | FE |
 | 9 | Annotation Interface | Annotation UI, submission flow | Phase 7, 8 | FE |
-| 10 | Quality Management | Scoring, IAA metrics, evaluators | Phase 9 | BE |
+| 9.1 | Project Configuration Experience | Workflow design, data sources, testing | Phase 9 | FE, BE |
+| 10 | Quality Management | Scoring, IAA metrics, evaluators | Phase 9.1 | BE |
 | 11 | Dashboards | Annotator, team, project, admin views | Phase 10 | FE |
 | 12 | Hooks & Plugins | WASM runtime, hook system | Phase 6 | BE |
 | 13 | Export & Integration | Export system, webhooks, Airflow | Phase 10 | BE |
@@ -378,29 +379,93 @@ Plans:
 
 ---
 
-## Phase 9: Annotation Interface
+## Phase 9: Annotation Interface ✅
 
 **Goal**: Complete annotator experience for creating annotations.
 
 **Requirements Covered**: REQ-TASK-003, REQ-LAYOUT-001
 
+**Completed**: 2026-02-04
+
 ### Deliverables
-- [ ] Annotation page with layout rendering
-- [ ] Draft auto-save
-- [ ] Annotation submission flow
-- [ ] Undo/redo support
-- [ ] Keyboard shortcut system
-- [ ] Progress indicator
-- [ ] Skip task flow
-- [ ] Previous annotations display
-- [ ] FE: Review interface
-- [ ] FE: Adjudication interface
+- [x] Annotation page with layout rendering
+- [x] Draft auto-save
+- [x] Annotation submission flow
+- [x] Undo/redo support
+- [x] Keyboard shortcut system
+- [x] Progress indicator
+- [x] Skip task flow
+- [x] Previous annotations display
+- [x] FE: Review interface
+- [x] FE: Adjudication interface
 
 ### Success Criteria
-- Complete annotation flow works end-to-end
-- Draft saves prevent data loss
-- Keyboard shortcuts improve efficiency
-- Review/adjudication interfaces work
+- [x] Complete annotation flow works end-to-end
+- [x] Draft saves prevent data loss
+- [x] Keyboard shortcuts improve efficiency
+- [x] Review/adjudication interfaces work
+
+---
+
+## Phase 9.1: Project Configuration Experience (INSERTED)
+
+**Goal**: Complete, polished experience for configuring projects with data sources, layouts, and workflows before activation. Enable workflow testing with transient data.
+
+**Depends on**: Phase 9
+
+### Key Areas
+
+**1. Workflow Designer**
+- Visual workflow builder (steps, transitions, conditions)
+- Step configuration (annotation, review, adjudication, auto-process)
+- Layout assignment per workflow step
+- Consensus and resolution strategy configuration
+- YAML import/export for advanced users
+
+**2. Data Source Configuration**
+- Input data source setup (shape, location, format)
+- Data row schema definition
+- Data flow configuration between workflow steps
+- Output/annotation schema validation
+- Preview sample data rows
+
+**3. Layout-to-Step Binding**
+- Assign layouts to workflow steps
+- Configure data binding (input → layout variables)
+- Configure output mapping (layout output → annotation schema)
+- Step-specific layout overrides
+
+**4. Workflow Testing Mode**
+- Test workflow with real data row (transient, not saved)
+- Step-through simulation
+- Validate data transformations
+- Preview annotator experience per step
+- Identify configuration errors before activation
+
+**5. Project Activation Checklist**
+- Validation that all required configuration is complete
+- Pre-flight checks before project can go "active"
+- Clear error messages for missing/invalid configuration
+
+### Deliverables
+- [ ] Workflow designer UI (visual builder)
+- [ ] Step configuration panel
+- [ ] Layout-to-step assignment interface
+- [ ] Data source configuration wizard
+- [ ] Data flow mapping UI
+- [ ] Workflow test mode (transient execution)
+- [ ] Step-through simulation UI
+- [ ] Project activation checklist
+- [ ] Pre-activation validation API
+- [ ] Configuration error reporting
+
+### Success Criteria
+- User can design complete workflow visually
+- Each workflow step has assigned layout
+- Data flows correctly between steps
+- Workflow can be tested without saving results
+- Project cannot activate with incomplete configuration
+- Experience feels polished and integrated
 
 ---
 
