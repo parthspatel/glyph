@@ -40,3 +40,5 @@ export type {
   UserPresence,
   PresenceResponse,
 } from "./queue";
+export { tasksApi } from "./tasks";
+export type { TaskWithLayout, Draft } from "./tasks";

@@ -7,3 +7,4 @@ export * from "./useQueue";
 export * from "./useWebSocket";
 export * from "./useUnsavedChanges";
 export * from "./useBreadcrumbs";
+export * from "./useTask";
