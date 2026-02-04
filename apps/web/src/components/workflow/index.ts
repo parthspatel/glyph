@@ -24,6 +24,18 @@ export {
 // Edges
 export { edgeTypes, TransitionEdge } from "./Canvas/edges/TransitionEdge";
 
+// Sidebar
+export { NodePalette } from "./Sidebar";
+export type { NodePaletteProps } from "./Sidebar";
+
+// Config Panel
+export { StepConfigPanel, PanelHeader, StepConfigContent } from "./ConfigPanel";
+export type { StepConfigPanelProps } from "./ConfigPanel";
+
+// Hooks
+export { useCanvasActions } from "./hooks/useCanvasActions";
+export { useStepConfig } from "./hooks/useStepConfig";
+
 // Stores
 export { useCanvasStore } from "./stores/canvasStore";
 export { useConfigStore } from "./stores/configStore";
