@@ -81,7 +81,8 @@ export const StepConfigPanel = memo(function StepConfigPanel({
     <Sheet open={!!selectedNode} onOpenChange={handleOpenChange}>
       <SheetContent
         side="right"
-        className="w-[75vw] sm:max-w-[75vw] p-0 flex flex-col"
+        className="w-[33vw] sm:max-w-[33vw] p-0 flex flex-col"
+        showCloseButton={false}
       >
         {/* Visually hidden accessibility elements for screen readers */}
         <SheetTitle className="sr-only">

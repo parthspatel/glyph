@@ -255,12 +255,12 @@ export function WorkflowDesignerPage() {
           </TabsList>
         </div>
 
-        <div className="flex-1 overflow-hidden">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <TabsContent value="visual" className="h-full m-0 p-0">
-            <WorkflowDesigner />
+            <WorkflowDesigner className="h-full" />
           </TabsContent>
           <TabsContent value="yaml" className="h-full m-0 p-0">
-            <WorkflowDesigner />
+            <WorkflowDesigner className="h-full" />
           </TabsContent>
           <TabsContent value="data" className="h-full m-0 p-0">
             <div className="h-full flex items-center justify-center text-muted-foreground">

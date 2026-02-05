@@ -15,7 +15,7 @@ import {
 } from "@tanstack/react-table";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronUp, ChevronDown, Settings2, Check } from "lucide-react";
+import { ChevronUp, ChevronDown, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {

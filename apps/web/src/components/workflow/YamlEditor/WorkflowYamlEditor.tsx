@@ -8,6 +8,7 @@ import type { editor } from "monaco-editor";
 import { Copy, Download, Wand2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/components/theme-provider";
 import { parseYamlConfig } from "../converters";
 
 // =============================================================================
@@ -42,6 +43,15 @@ export const WorkflowYamlEditor = memo(function WorkflowYamlEditor({
   const monacoRef = useRef<Monaco | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+  const { theme } = useTheme();
+
+  // Determine Monaco theme based on current app theme
+  const monacoTheme =
+    theme === "dark" ||
+    (theme === "system" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches)
+      ? "vs-dark"
+      : "light";
 
   // Validate YAML on change
   useEffect(() => {
@@ -186,7 +196,7 @@ export const WorkflowYamlEditor = memo(function WorkflowYamlEditor({
           value={value}
           onChange={handleChange}
           onMount={handleEditorDidMount}
-          theme="vs-dark"
+          theme={monacoTheme}
           options={{
             readOnly,
             minimap: { enabled: true },

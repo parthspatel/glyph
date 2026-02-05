@@ -141,10 +141,72 @@ body {
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+    * {
+        @apply border-border outline-ring/50;
     }
-  body {
-    @apply bg-background text-foreground;
+    body {
+        @apply bg-background text-foreground;
     }
+}
+
+/* =============================================================================
+   React Flow Theming
+   ============================================================================= */
+
+/* Controls panel theming */
+.react-flow__controls {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow:
+        0 1px 3px 0 rgb(0 0 0 / 0.1),
+        0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.react-flow__controls-button {
+    background-color: var(--color-card);
+    border: none;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--color-foreground);
+    fill: var(--color-foreground);
+}
+
+.react-flow__controls-button:hover {
+    background-color: var(--color-muted);
+}
+
+.react-flow__controls-button:last-child {
+    border-bottom: none;
+}
+
+.react-flow__controls-button svg {
+    fill: currentColor;
+}
+
+/* MiniMap theming */
+.react-flow__minimap {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow:
+        0 1px 3px 0 rgb(0 0 0 / 0.1),
+        0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.dark .react-flow__minimap-mask {
+    fill: rgba(0, 0, 0, 0.6);
+}
+
+/* Background dots for dark mode */
+.dark .react-flow__background pattern circle {
+    fill: rgba(255, 255, 255, 0.15);
+}
+
+/* Edge styling */
+.react-flow__edge-path {
+    stroke: var(--color-muted-foreground);
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+    stroke: var(--color-primary);
 }

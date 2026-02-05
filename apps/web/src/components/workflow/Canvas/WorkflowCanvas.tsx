@@ -16,6 +16,7 @@ import {
   type OnConnect,
   type Connection,
   type IsValidConnection,
+  type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useHotkeys } from "react-hotkeys-hook";
@@ -153,16 +154,20 @@ export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
     [isValidConnection],
   );
 
-  // Handle node selection
-  const handleSelectionChange = useCallback(
-    ({ nodes: selectedNodes }: { nodes: WorkflowNode[] }) => {
-      const selectedId =
-        selectedNodes.length === 1 ? selectedNodes[0].id : null;
-      selectNode(selectedId);
-      onNodeSelect?.(selectedId);
+  // Handle node click - only opens panel on actual click, not drag
+  const handleNodeClick: NodeMouseHandler<WorkflowNode> = useCallback(
+    (_event, node) => {
+      selectNode(node.id);
+      onNodeSelect?.(node.id);
     },
     [selectNode, onNodeSelect],
   );
+
+  // Handle pane click - deselect when clicking empty space
+  const handlePaneClick = useCallback(() => {
+    selectNode(null);
+    onNodeSelect?.(null);
+  }, [selectNode, onNodeSelect]);
 
   // Keyboard shortcuts
   useHotkeys(
@@ -244,7 +249,8 @@ export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
         isValidConnection={handleIsValidConnection}
-        onSelectionChange={handleSelectionChange}
+        onNodeClick={handleNodeClick}
+        onPaneClick={handlePaneClick}
         onViewportChange={setViewport}
         fitView
         fitViewOptions={{ padding: 0.2 }}
@@ -268,6 +274,7 @@ export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
             type: "arrowclosed" as const,
             width: 20,
             height: 20,
+            color: "hsl(var(--foreground))",
           },
         }}
       >
