@@ -19,7 +19,8 @@
 | 8 | Layout System | Nunjucks runtime, components, rendering | Phase 5 | FE |
 | 9 | Annotation Interface | Annotation UI, submission flow | Phase 7, 8 | FE |
 | 9.1 | Project Configuration Experience | Workflow design, data sources, testing | Phase 9 | FE, BE |
-| 10 | Quality Management | Scoring, IAA metrics, evaluators | Phase 9.1 | BE |
+| 9.2 | Project Overview Modules & UI Polish | Modular project config, grid layout, consistent styling | Phase 9.1 | FE |
+| 10 | Quality Management | Scoring, IAA metrics, evaluators | Phase 9.2 | BE |
 | 11 | Dashboards | Annotator, team, project, admin views | Phase 10 | FE |
 | 12 | Hooks & Plugins | WASM runtime, hook system | Phase 6 | BE |
 | 13 | Export & Integration | Export system, webhooks, Airflow | Phase 10 | BE |
@@ -482,6 +483,79 @@ Plans executed:
 - [x] Workflow can be tested without saving results
 - [x] Project cannot activate with incomplete configuration
 - [x] Experience feels polished and integrated
+
+---
+
+## Phase 9.2: Project Overview Modules & UI Polish (INSERTED)
+
+**Goal**: Redesign project creation and overview experience with modular configuration chips and comprehensive UI polish across all screens.
+
+**Depends on**: Phase 9.1
+
+### Key Changes
+
+**1. Simplified Project Creation**
+- Create project screen shows only: Name, Description, Tags
+- All other configuration moved to project overview modules
+
+**2. Project Overview Module Grid**
+- Grid layout with clickable module "chips"
+- Each module shows overview/summary of its content
+- Click to edit (modal or dedicated screen)
+
+**3. Module Types**
+| Module | Display Preview | Edit Mode |
+|--------|----------------|-----------|
+| Project Type | Type name, icon | Modal selector |
+| Deadline | Date, countdown, status indicator | Modal date picker |
+| Data Sources | List of source names, location hints | Dedicated screen |
+| Data Schemas | Input/output schema summaries | Dedicated screen |
+| Workflow | Visual thumbnail of workflow graph | Workflow designer |
+| Team | Assigned team name, member count | Modal selector |
+| Skills Required | Skill badges | Modal multi-select |
+
+**4. UI Polish (Platform-Wide)**
+- Consistent padding and spacing across all screens
+- Proper use of design tokens from Phase 3.1
+- Card styling with appropriate shadows and borders
+- Responsive grid layouts
+- Hover states and transitions
+- Empty states with helpful guidance
+- Loading states and skeletons
+
+Plans:
+- [ ] 09.2-01-PLAN.md — Base ModuleCard component with states
+- [ ] 09.2-02-PLAN.md — Simplified CreateProjectPage
+- [ ] 09.2-03-PLAN.md — ProjectType + Deadline modules
+- [ ] 09.2-04-PLAN.md — Team + Skills modules
+- [ ] 09.2-05-PLAN.md — DataSources + DataSchemas + Workflow modules
+- [ ] 09.2-06-PLAN.md — ProjectOverviewPage with module grid
+- [ ] 09.2-07-PLAN.md — Platform-wide UI polish audit
+
+### Deliverables
+- [ ] Simplified CreateProjectPage (name, description, tags only)
+- [ ] ProjectOverviewPage with module grid layout
+- [ ] ProjectTypeModule chip with preview and modal edit
+- [ ] DeadlineModule chip with date display and modal edit
+- [ ] DataSourcesModule chip with preview and link to config
+- [ ] DataSchemasModule chip with preview and link to config
+- [ ] WorkflowModule chip with thumbnail preview
+- [ ] TeamModule chip with team info and modal edit
+- [ ] SkillsModule chip with badges and modal edit
+- [ ] Consistent card/chip component styles
+- [ ] Platform-wide padding and spacing audit
+- [ ] Loading skeletons for all modules
+- [ ] Empty state designs for unconfigured modules
+- [ ] Responsive grid behavior (mobile/tablet/desktop)
+
+### Success Criteria
+- Project creation is quick (3 fields only)
+- Project overview shows all config at a glance
+- Each module chip displays meaningful preview
+- Editing flows feel natural (modal vs screen)
+- UI looks polished with consistent spacing
+- Dark/light modes work correctly
+- No visual "jank" or inconsistent styling
 
 ---
 
