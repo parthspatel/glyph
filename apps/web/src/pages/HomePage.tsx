@@ -7,7 +7,7 @@ export function HomePage() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="max-w-7xl mx-auto p-6 space-y-6">
         <Skeleton className="h-10 w-48" />
         <Skeleton className="h-4 w-64" />
         <div className="grid gap-4 md:grid-cols-3">
@@ -36,27 +36,27 @@ export function HomePage() {
 // Simple admin dashboard placeholder
 function AdminDashboard() {
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
+      <header>
+        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
         <p className="text-muted-foreground">
           Welcome back! Here's an overview of your annotation platform.
         </p>
-      </div>
+      </header>
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="font-semibold">Projects</h3>
-          <p className="text-2xl font-bold">--</p>
+        <div className="bg-card rounded-lg border p-4 border-l-4 border-l-primary hover:shadow-md transition-shadow">
+          <h3 className="font-semibold text-foreground">Projects</h3>
+          <p className="text-2xl font-bold text-foreground">--</p>
           <p className="text-sm text-muted-foreground">Active projects</p>
         </div>
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="font-semibold">Users</h3>
-          <p className="text-2xl font-bold">--</p>
+        <div className="bg-card rounded-lg border p-4 border-l-4 border-l-info hover:shadow-md transition-shadow">
+          <h3 className="font-semibold text-foreground">Users</h3>
+          <p className="text-2xl font-bold text-foreground">--</p>
           <p className="text-sm text-muted-foreground">Team members</p>
         </div>
-        <div className="rounded-lg border bg-card p-6">
-          <h3 className="font-semibold">Tasks</h3>
-          <p className="text-2xl font-bold">--</p>
+        <div className="bg-card rounded-lg border p-4 border-l-4 border-l-success hover:shadow-md transition-shadow">
+          <h3 className="font-semibold text-foreground">Tasks</h3>
+          <p className="text-2xl font-bold text-foreground">--</p>
           <p className="text-sm text-muted-foreground">Pending reviews</p>
         </div>
       </div>

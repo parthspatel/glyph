@@ -28,21 +28,24 @@ export function UserProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex gap-6 items-start">
           <Skeleton className="size-20 rounded-full" />
           <div className="space-y-2 flex-1">
             <Skeleton className="h-8 w-48" />
             <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-24" />
           </div>
         </div>
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-48 w-full" />
       </div>
     );
   }
 
   if (error || !user) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4">
           Failed to load user profile. Please try again.
         </div>
@@ -77,7 +80,7 @@ export function UserProfilePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Header with avatar and name */}
       <header className="flex gap-6 items-start">
         <div className="size-20 rounded-full bg-muted flex items-center justify-center text-2xl font-semibold overflow-hidden">

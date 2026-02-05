@@ -11,6 +11,7 @@ import {
 import { useCurrentUser } from "../hooks/useUser";
 import { TeamTree, MemberList, AddMemberModal } from "../components/team";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export function TeamDetailPage() {
@@ -76,10 +77,24 @@ export function TeamDetailPage() {
 
   if (teamLoading) {
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
-        <div className="space-y-4 animate-pulse">
-          <div className="h-8 w-48 bg-muted rounded" />
-          <div className="h-4 w-32 bg-muted rounded" />
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        {/* Breadcrumb skeleton */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-12" />
+          <Skeleton className="h-4 w-4" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+        {/* Header skeleton */}
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        {/* Stats skeleton */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
         </div>
       </div>
     );
@@ -87,7 +102,7 @@ export function TeamDetailPage() {
 
   if (!team) {
     return (
-      <div className="max-w-4xl mx-auto p-6 space-y-6">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="bg-destructive/10 text-destructive border border-destructive/20 rounded-md p-4">
           Team not found
         </div>
@@ -104,7 +119,7 @@ export function TeamDetailPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="max-w-6xl mx-auto p-6 space-y-6">
       {/* Breadcrumb */}
       <nav className="flex items-center gap-2 text-sm">
         <Link

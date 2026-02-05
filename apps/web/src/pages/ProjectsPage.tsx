@@ -51,7 +51,7 @@ export function ProjectsPage() {
   const currentPage = Math.floor(currentOffset / pageSize);
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
+    <div className="max-w-7xl mx-auto p-6 space-y-6">
       {/* Header */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
