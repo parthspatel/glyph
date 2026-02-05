@@ -20,7 +20,6 @@ export const TransitionEdge = memo(function TransitionEdge({
   targetPosition,
   data,
   selected,
-  markerEnd,
 }: EdgeProps<WorkflowEdge>) {
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
@@ -34,17 +33,18 @@ export const TransitionEdge = memo(function TransitionEdge({
 
   const label = data?.label || data?.condition?.expression;
 
+  // Dynamic colors based on selection state
+  const strokeColor = selected ? "#a855f7" : "#64748b";
+
   return (
     <>
       <BaseEdge
         id={id}
         path={edgePath}
-        markerEnd={markerEnd}
+        markerEnd={`url(#${selected ? "arrow-selected" : "arrow-default"})`}
         style={{
           strokeWidth: selected ? 3 : 2,
-          stroke: selected
-            ? "hsl(var(--primary))"
-            : "hsl(var(--foreground) / 0.5)",
+          stroke: strokeColor,
         }}
         className="transition-all duration-200"
       />

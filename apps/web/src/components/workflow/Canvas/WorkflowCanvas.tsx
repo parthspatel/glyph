@@ -240,6 +240,38 @@ export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {/* SVG marker definitions for edge arrows */}
+      <svg
+        style={{ position: "absolute", top: 0, left: 0, width: 0, height: 0 }}
+      >
+        <defs>
+          <marker
+            id="arrow-default"
+            viewBox="0 0 10 10"
+            markerWidth={12}
+            markerHeight={12}
+            refX={10}
+            refY={5}
+            orient="auto-start-reverse"
+            markerUnits="strokeWidth"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+          </marker>
+          <marker
+            id="arrow-selected"
+            viewBox="0 0 10 10"
+            markerWidth={12}
+            markerHeight={12}
+            refX={10}
+            refY={5}
+            orient="auto-start-reverse"
+            markerUnits="strokeWidth"
+          >
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#a855f7" />
+          </marker>
+        </defs>
+      </svg>
+
       <ReactFlow<WorkflowNode, WorkflowEdge>
         nodes={nodes}
         edges={edges}
@@ -270,12 +302,6 @@ export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
         defaultEdgeOptions={{
           type: "transition",
           animated: false,
-          markerEnd: {
-            type: "arrowclosed" as const,
-            width: 20,
-            height: 20,
-            color: "hsl(var(--foreground))",
-          },
         }}
       >
         <Controls position="bottom-left" showZoom showFitView showInteractive />
