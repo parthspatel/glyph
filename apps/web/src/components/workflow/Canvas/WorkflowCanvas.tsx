@@ -10,6 +10,8 @@ import {
   MiniMap,
   Background,
   BackgroundVariant,
+  ConnectionLineType,
+  ConnectionMode,
   useReactFlow,
   type OnConnect,
   type Connection,
@@ -256,6 +258,9 @@ export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
         deleteKeyCode={[]}
         minZoom={0.1}
         maxZoom={2}
+        connectionMode={ConnectionMode.Loose}
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectOnClick={true}
         defaultEdgeOptions={{
           type: "transition",
           animated: false,

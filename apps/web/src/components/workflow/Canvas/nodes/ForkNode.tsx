@@ -16,6 +16,7 @@ export const ForkNode = memo(function ForkNode({
       <Handle
         type="target"
         position={Position.Top}
+        id="target"
         className="!bg-teal-500 !w-3 !h-3 !border-2 !border-background"
       />
       <div className="flex flex-col items-center gap-1">

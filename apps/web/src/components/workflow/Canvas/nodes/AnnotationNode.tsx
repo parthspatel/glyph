@@ -13,7 +13,9 @@ export const AnnotationNode = memo(function AnnotationNode({
   data,
 }: NodeProps<WorkflowNode>) {
   const config = data.stepConfig;
-  const layoutName = config?.settings?.layout_id ? "Layout assigned" : "No layout";
+  const layoutName = config?.settings?.layout_id
+    ? "Layout assigned"
+    : "No layout";
   const skillsCount = config?.settings?.required_roles?.length ?? 0;
 
   return (
@@ -21,12 +23,13 @@ export const AnnotationNode = memo(function AnnotationNode({
       <Handle
         type="target"
         position={Position.Top}
+        id="target"
         className="!bg-blue-500 !w-3 !h-3 !border-2 !border-background"
       />
       <div
         className={cn(
           "w-48 min-h-16 rounded-lg border bg-card shadow-sm overflow-hidden",
-          selected && "border-primary"
+          selected && "border-primary",
         )}
       >
         {/* Header */}
@@ -49,6 +52,7 @@ export const AnnotationNode = memo(function AnnotationNode({
       <Handle
         type="source"
         position={Position.Bottom}
+        id="source"
         className="!bg-blue-500 !w-3 !h-3 !border-2 !border-background"
       />
     </BaseNode>

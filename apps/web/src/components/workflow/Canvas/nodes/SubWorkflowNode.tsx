@@ -20,12 +20,13 @@ export const SubWorkflowNode = memo(function SubWorkflowNode({
       <Handle
         type="target"
         position={Position.Top}
+        id="target"
         className="!bg-slate-500 !w-3 !h-3 !border-2 !border-background"
       />
       <div
         className={cn(
           "w-48 min-h-16 rounded-lg border-2 border-dashed bg-card shadow-sm overflow-hidden",
-          selected ? "border-primary" : "border-slate-400"
+          selected ? "border-primary" : "border-slate-400",
         )}
       >
         {/* Header */}
@@ -48,6 +49,7 @@ export const SubWorkflowNode = memo(function SubWorkflowNode({
       <Handle
         type="source"
         position={Position.Bottom}
+        id="source"
         className="!bg-slate-500 !w-3 !h-3 !border-2 !border-background"
       />
     </BaseNode>

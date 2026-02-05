@@ -24,6 +24,7 @@ export const StartNode = memo(function StartNode({
       <Handle
         type="source"
         position={Position.Bottom}
+        id="source"
         className="!bg-foreground !w-3 !h-3 !border-2 !border-background"
       />
     </BaseNode>

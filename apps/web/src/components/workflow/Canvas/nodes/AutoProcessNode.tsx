@@ -19,12 +19,13 @@ export const AutoProcessNode = memo(function AutoProcessNode({
       <Handle
         type="target"
         position={Position.Top}
+        id="target"
         className="!bg-indigo-500 !w-3 !h-3 !border-2 !border-background"
       />
       <div
         className={cn(
           "w-48 min-h-16 rounded-lg border bg-card shadow-sm overflow-hidden",
-          selected && "border-primary"
+          selected && "border-primary",
         )}
       >
         {/* Header */}
@@ -43,6 +44,7 @@ export const AutoProcessNode = memo(function AutoProcessNode({
       <Handle
         type="source"
         position={Position.Bottom}
+        id="source"
         className="!bg-indigo-500 !w-3 !h-3 !border-2 !border-background"
       />
     </BaseNode>

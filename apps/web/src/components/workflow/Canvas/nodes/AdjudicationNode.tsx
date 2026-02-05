@@ -13,23 +13,27 @@ export const AdjudicationNode = memo(function AdjudicationNode({
   data,
 }: NodeProps<WorkflowNode>) {
   const config = data.stepConfig;
-  const layoutName = config?.settings?.layout_id ? "Layout assigned" : "No layout";
+  const layoutName = config?.settings?.layout_id
+    ? "Layout assigned"
+    : "No layout";
   const threshold = config?.settings?.threshold;
-  const thresholdText = threshold !== undefined
-    ? `${Math.round(threshold * 100)}% agreement`
-    : "No threshold";
+  const thresholdText =
+    threshold !== undefined
+      ? `${Math.round(threshold * 100)}% agreement`
+      : "No threshold";
 
   return (
     <BaseNode selected={selected} hasError={data.hasError}>
       <Handle
         type="target"
         position={Position.Top}
+        id="target"
         className="!bg-orange-500 !w-3 !h-3 !border-2 !border-background"
       />
       <div
         className={cn(
           "w-48 min-h-16 rounded-lg border bg-card shadow-sm overflow-hidden",
-          selected && "border-primary"
+          selected && "border-primary",
         )}
       >
         {/* Header */}
@@ -48,6 +52,7 @@ export const AdjudicationNode = memo(function AdjudicationNode({
       <Handle
         type="source"
         position={Position.Bottom}
+        id="source"
         className="!bg-orange-500 !w-3 !h-3 !border-2 !border-background"
       />
     </BaseNode>
