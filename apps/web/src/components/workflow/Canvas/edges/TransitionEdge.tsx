@@ -41,9 +41,12 @@ export const TransitionEdge = memo(function TransitionEdge({
         path={edgePath}
         markerEnd={markerEnd}
         style={{
-          strokeWidth: selected ? 2.5 : 2,
-          stroke: selected ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+          strokeWidth: selected ? 3 : 2,
+          stroke: selected
+            ? "hsl(var(--primary))"
+            : "hsl(var(--foreground) / 0.5)",
         }}
+        className="transition-all duration-200"
       />
       {label && (
         <EdgeLabelRenderer>

@@ -15,9 +15,17 @@ import {
 } from "@tanstack/react-table";
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronUp, ChevronDown } from "lucide-react";
+import { ChevronUp, ChevronDown, Settings2, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { Project, ProjectStatus } from "../../api/projects";
 
 interface ProjectTableProps {
@@ -28,23 +36,81 @@ interface ProjectTableProps {
 }
 
 function StatusBadge({ status }: { status: ProjectStatus }) {
-  const statusColors: Record<ProjectStatus, string> = {
-    draft: "bg-muted text-muted-foreground",
-    active: "bg-success/10 text-success",
-    paused: "bg-warning/10 text-warning",
-    completed: "bg-info/10 text-info",
-    archived: "bg-muted text-muted-foreground",
+  const statusConfig: Record<
+    ProjectStatus,
+    { bg: string; text: string; dot: string }
+  > = {
+    draft: {
+      bg: "bg-slate-100 dark:bg-slate-800",
+      text: "text-slate-600 dark:text-slate-400",
+      dot: "bg-slate-400",
+    },
+    active: {
+      bg: "bg-emerald-50 dark:bg-emerald-950",
+      text: "text-emerald-700 dark:text-emerald-400",
+      dot: "bg-emerald-500",
+    },
+    paused: {
+      bg: "bg-amber-50 dark:bg-amber-950",
+      text: "text-amber-700 dark:text-amber-400",
+      dot: "bg-amber-500",
+    },
+    completed: {
+      bg: "bg-blue-50 dark:bg-blue-950",
+      text: "text-blue-700 dark:text-blue-400",
+      dot: "bg-blue-500",
+    },
+    archived: {
+      bg: "bg-gray-100 dark:bg-gray-800",
+      text: "text-gray-500 dark:text-gray-500",
+      dot: "bg-gray-400",
+    },
   };
+
+  const config = statusConfig[status];
 
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize",
-        statusColors[status],
+        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium capitalize",
+        config.bg,
+        config.text,
       )}
     >
+      <span className={cn("size-1.5 rounded-full", config.dot)} />
       {status}
     </span>
+  );
+}
+
+function ProgressBar({
+  completed,
+  total,
+}: {
+  completed: number;
+  total: number;
+}) {
+  const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+  return (
+    <div className="flex items-center gap-2 min-w-[100px]">
+      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+        <div
+          className={cn(
+            "h-full rounded-full transition-all duration-300",
+            pct === 100
+              ? "bg-emerald-500"
+              : pct > 0
+                ? "bg-primary"
+                : "bg-transparent",
+          )}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <span className="text-xs text-muted-foreground w-8 text-right">
+        {pct}%
+      </span>
+    </div>
   );
 }
 
@@ -111,8 +177,7 @@ const columns: ColumnDef<Project>[] = [
     cell: ({ row }) => {
       const total = row.original.task_count ?? 0;
       const completed = row.original.completed_task_count ?? 0;
-      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
-      return <span className="text-muted-foreground">{pct}%</span>;
+      return <ProgressBar completed={completed} total={total} />;
     },
     enableSorting: false,
   },
@@ -184,28 +249,47 @@ export function ProjectTable({
     enableRowSelection: true,
   });
 
+  const hiddenColumnCount = table
+    .getAllColumns()
+    .filter((col) => col.getCanHide() && !col.getIsVisible()).length;
+
   return (
     <div className="overflow-x-auto">
-      {/* Column visibility toggle */}
-      <div className="flex items-center gap-2 mb-3 text-sm text-muted-foreground">
-        <span className="font-medium">Columns:</span>
-        {table
-          .getAllColumns()
-          .filter((col) => col.getCanHide())
-          .map((col) => (
-            <label
-              key={col.id}
-              className="flex items-center gap-1.5 cursor-pointer"
-            >
-              <input
-                type="checkbox"
-                checked={col.getIsVisible()}
-                onChange={col.getToggleVisibilityHandler()}
-                className="size-4 rounded border-input cursor-pointer accent-primary"
-              />
-              {col.id}
-            </label>
-          ))}
+      {/* Table header with column visibility dropdown */}
+      <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
+        <span className="text-sm text-muted-foreground">
+          {projects.length} project{projects.length !== 1 ? "s" : ""}
+        </span>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Settings2 className="size-4" />
+              Columns
+              {hiddenColumnCount > 0 && (
+                <span className="ml-1 size-5 rounded-full bg-primary/10 text-primary text-xs flex items-center justify-center">
+                  {hiddenColumnCount}
+                </span>
+              )}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {table
+              .getAllColumns()
+              .filter((col) => col.getCanHide())
+              .map((col) => (
+                <DropdownMenuCheckboxItem
+                  key={col.id}
+                  checked={col.getIsVisible()}
+                  onCheckedChange={(value) => col.toggleVisibility(!!value)}
+                  className="capitalize"
+                >
+                  {col.id.replace(/_/g, " ")}
+                </DropdownMenuCheckboxItem>
+              ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       <table className="w-full text-sm">

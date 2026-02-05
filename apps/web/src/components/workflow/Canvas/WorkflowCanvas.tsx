@@ -264,6 +264,11 @@ export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
         defaultEdgeOptions={{
           type: "transition",
           animated: false,
+          markerEnd: {
+            type: "arrowclosed" as const,
+            width: 20,
+            height: 20,
+          },
         }}
       >
         <Controls position="bottom-left" showZoom showFitView showInteractive />
