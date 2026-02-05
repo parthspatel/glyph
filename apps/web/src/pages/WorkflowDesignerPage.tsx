@@ -23,7 +23,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 // Types
 // =============================================================================
 
-type DesignerTab = "visual" | "yaml" | "data" | "test";
+type DesignerTab = "design" | "data" | "test";
 
 // =============================================================================
 // Component
@@ -34,8 +34,8 @@ export function WorkflowDesignerPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Get tab from URL or default to visual
-  const activeTab = (searchParams.get("tab") as DesignerTab) || "visual";
+  // Get tab from URL or default to design
+  const activeTab = (searchParams.get("tab") as DesignerTab) || "design";
 
   // State
   const [isSaving, setIsSaving] = useState(false);
@@ -118,7 +118,7 @@ export function WorkflowDesignerPage() {
     (section: string) => {
       switch (section) {
         case "workflow":
-          setSearchParams({ tab: "visual" });
+          setSearchParams({ tab: "design" });
           break;
         case "data-source":
           setSearchParams({ tab: "data" });
@@ -248,18 +248,14 @@ export function WorkflowDesignerPage() {
       >
         <div className="border-b px-4">
           <TabsList className="h-10">
-            <TabsTrigger value="visual">Visual</TabsTrigger>
-            <TabsTrigger value="yaml">YAML</TabsTrigger>
+            <TabsTrigger value="design">Design</TabsTrigger>
             <TabsTrigger value="data">Data Source</TabsTrigger>
             <TabsTrigger value="test">Test</TabsTrigger>
           </TabsList>
         </div>
 
         <div className="flex-1 min-h-0 overflow-hidden">
-          <TabsContent value="visual" className="h-full m-0 p-0">
-            <WorkflowDesigner className="h-full" />
-          </TabsContent>
-          <TabsContent value="yaml" className="h-full m-0 p-0">
+          <TabsContent value="design" className="h-full m-0 p-0">
             <WorkflowDesigner className="h-full" />
           </TabsContent>
           <TabsContent value="data" className="h-full m-0 p-0">
