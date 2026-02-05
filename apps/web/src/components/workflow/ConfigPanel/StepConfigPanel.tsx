@@ -6,6 +6,8 @@ import { memo, useCallback, useMemo } from "react";
 import {
   Sheet,
   SheetContent,
+  SheetTitle,
+  SheetDescription,
 } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCanvasStore } from "../stores/canvasStore";
@@ -53,7 +55,7 @@ export const StepConfigPanel = memo(function StepConfigPanel({
         handleClose();
       }
     },
-    [handleClose]
+    [handleClose],
   );
 
   // Handle name change
@@ -61,7 +63,7 @@ export const StepConfigPanel = memo(function StepConfigPanel({
     (name: string) => {
       updateConfig({ name });
     },
-    [updateConfig]
+    [updateConfig],
   );
 
   // Handle delete
@@ -81,6 +83,15 @@ export const StepConfigPanel = memo(function StepConfigPanel({
         side="right"
         className="w-[75vw] sm:max-w-[75vw] p-0 flex flex-col"
       >
+        {/* Visually hidden accessibility elements for screen readers */}
+        <SheetTitle className="sr-only">
+          Configure Step: {selectedNode.data.label}
+        </SheetTitle>
+        <SheetDescription className="sr-only">
+          Configure settings for the{" "}
+          {selectedNode.data.nodeType.replace("_", " ")} step
+        </SheetDescription>
+
         {/* Header */}
         <PanelHeader
           node={selectedNode}
