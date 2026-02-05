@@ -43,7 +43,6 @@ export function WorkflowDesignerPage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [showActivationChecklist, setShowActivationChecklist] = useState(false);
   const [showActivationSuccess, setShowActivationSuccess] = useState(false);
-  const [showTestMode, setShowTestMode] = useState(false);
 
   // Hooks
   const { data: project, isLoading, error, refetch } = useProject(projectId);
@@ -59,11 +58,7 @@ export function WorkflowDesignerPage() {
   // Handle tab change
   const handleTabChange = useCallback(
     (tab: string) => {
-      if (tab === "test") {
-        setShowTestMode(true);
-      } else {
-        setSearchParams({ tab });
-      }
+      setSearchParams({ tab });
     },
     [setSearchParams],
   );
@@ -177,15 +172,6 @@ export function WorkflowDesignerPage() {
     );
   }
 
-  // Test mode view
-  if (showTestMode) {
-    return (
-      <div className="h-screen flex flex-col">
-        <WorkflowTester onClose={() => setShowTestMode(false)} />
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex flex-col">
       {/* Header */}
@@ -264,7 +250,9 @@ export function WorkflowDesignerPage() {
             </div>
           </TabsContent>
           <TabsContent value="test" className="h-full m-0 p-0">
-            {/* Test mode handled separately */}
+            <WorkflowTester
+              onClose={() => setSearchParams({ tab: "design" })}
+            />
           </TabsContent>
         </div>
       </Tabs>
