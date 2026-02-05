@@ -18,11 +18,12 @@ import { useCurrentUser } from "@/hooks/useUser";
 import { UserMenu } from "./UserMenu";
 import { cn } from "@/lib/utils";
 import { useRef, useCallback } from "react";
-import { FileText, Settings, ClipboardList } from "lucide-react";
+import { FileText, Settings, ClipboardList, GitBranch } from "lucide-react";
 
 // Project-scoped navigation items
 const projectNavItems = [
   { path: "", label: "Overview", icon: FileText },
+  { path: "/workflow", label: "Workflow", icon: GitBranch },
   { path: "/edit", label: "Settings", icon: Settings },
   { path: "/tasks", label: "Tasks", icon: ClipboardList },
 ];

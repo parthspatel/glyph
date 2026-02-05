@@ -66,7 +66,7 @@ interface WorkflowCanvasInnerProps {
   onNodeSelect?: (nodeId: string | null) => void;
 }
 
-const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
+export const WorkflowCanvasInner = memo(function WorkflowCanvasInner({
   className,
   onConnect: onConnectProp,
   onNodeSelect,
