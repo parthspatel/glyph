@@ -524,38 +524,38 @@ Plans executed:
 - Loading states and skeletons
 
 Plans:
-- [ ] 09.2-01-PLAN.md — Base ModuleCard component with states
-- [ ] 09.2-02-PLAN.md — Simplified CreateProjectPage
-- [ ] 09.2-03-PLAN.md — ProjectType + Deadline modules
-- [ ] 09.2-04-PLAN.md — Team + Skills modules
-- [ ] 09.2-05-PLAN.md — DataSources + DataSchemas + Workflow modules
-- [ ] 09.2-06-PLAN.md — ProjectOverviewPage with module grid
-- [ ] 09.2-07-PLAN.md — Platform-wide UI polish audit
+- [x] 09.2-01-PLAN.md — Base ModuleCard component with states
+- [x] 09.2-02-PLAN.md — Simplified CreateProjectPage
+- [x] 09.2-03-PLAN.md — ProjectType + Deadline modules
+- [x] 09.2-04-PLAN.md — Team + Skills modules
+- [x] 09.2-05-PLAN.md — DataSources + DataSchemas + Workflow modules
+- [x] 09.2-06-PLAN.md — ProjectOverviewPage with module grid
+- [x] 09.2-07-PLAN.md — Platform-wide UI polish audit
 
 ### Deliverables
-- [ ] Simplified CreateProjectPage (name, description, tags only)
-- [ ] ProjectOverviewPage with module grid layout
-- [ ] ProjectTypeModule chip with preview and modal edit
-- [ ] DeadlineModule chip with date display and modal edit
-- [ ] DataSourcesModule chip with preview and link to config
-- [ ] DataSchemasModule chip with preview and link to config
-- [ ] WorkflowModule chip with thumbnail preview
-- [ ] TeamModule chip with team info and modal edit
-- [ ] SkillsModule chip with badges and modal edit
-- [ ] Consistent card/chip component styles
-- [ ] Platform-wide padding and spacing audit
-- [ ] Loading skeletons for all modules
-- [ ] Empty state designs for unconfigured modules
-- [ ] Responsive grid behavior (mobile/tablet/desktop)
+- [x] Simplified CreateProjectPage (name, description, tags only)
+- [x] ProjectOverviewPage with module grid layout
+- [x] ProjectTypeModule chip with preview and modal edit
+- [x] DeadlineModule chip with date display and modal edit
+- [x] DataSourcesModule chip with preview and link to config
+- [x] DataSchemasModule chip with preview and link to config
+- [x] WorkflowModule chip with thumbnail preview
+- [x] TeamModule chip with team info and modal edit
+- [x] SkillsModule chip with badges and modal edit
+- [x] Consistent card/chip component styles
+- [x] Platform-wide padding and spacing audit
+- [x] Loading skeletons for all modules
+- [x] Empty state designs for unconfigured modules
+- [x] Responsive grid behavior (mobile/tablet/desktop)
 
 ### Success Criteria
-- Project creation is quick (3 fields only)
-- Project overview shows all config at a glance
-- Each module chip displays meaningful preview
-- Editing flows feel natural (modal vs screen)
-- UI looks polished with consistent spacing
-- Dark/light modes work correctly
-- No visual "jank" or inconsistent styling
+- [x] Project creation is quick (3 fields only)
+- [x] Project overview shows all config at a glance
+- [x] Each module chip displays meaningful preview
+- [x] Editing flows feel natural (modal vs screen)
+- [x] UI looks polished with consistent spacing
+- [x] Dark/light modes work correctly
+- [x] No visual "jank" or inconsistent styling
 
 ---
 
